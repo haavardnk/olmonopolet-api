@@ -1,5 +1,0 @@
-{% load i18n %}{% autoescape off %}{% blocktrans with site_name=current_site.name %}Hei!{% endblocktrans %}
-
-{% block content %}{% endblock content %}
-
-{% endautoescape %}

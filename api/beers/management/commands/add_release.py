@@ -1,10 +1,9 @@
-import random
+from datetime import timedelta
+
 from beers.models import VmpNotReleased
 from django.core.management.base import BaseCommand
-from datetime import timedelta
 from django.utils import timezone
 from django_q.models import Schedule
-from allauth.socialaccount.models import SocialToken
 
 
 class Command(BaseCommand):
@@ -77,8 +76,6 @@ class Command(BaseCommand):
         else:
             update_runs = 7
 
-        social_tokens = SocialToken.objects.all()
-
         for update_run in range(0, update_runs):
             Schedule.objects.create(
                 name="Release: "
@@ -86,9 +83,6 @@ class Command(BaseCommand):
                 + " - Update Untappd "
                 + str(update_run + 1),
                 func="beers.tasks.smart_update_untappd",
-                kwargs="token='"
-                + social_tokens[random.randint(0, len(social_tokens))].token
-                + "'",
                 schedule_type=Schedule.ONCE,
                 next_run=timezone.now() + timedelta(minutes=5),
             )

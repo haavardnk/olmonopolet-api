@@ -1,9 +1,0 @@
-{% extends "account/email/base_message.txt" %}
-{% load account %}
-{% load i18n %}
-
-{% block content %}{% autoescape off %}{% user_display user as user_display %}{% blocktranslate with site_name=current_site.name site_domain=current_site.domain %}Du mottar denne e-posten fordi brukeren {{ user_display }} har oppgitt e-postadressen din for å registrere en konto hos {{ site_name }}.{% endblocktranslate %}
-
-{% if code %}{% blocktranslate %}Din e-postbekreftelseskode er oppført nedenfor. Vennligst skriv den inn i det åpne nettleservinduet ditt.{% endblocktranslate %}
-
-{{ code }}{% else %}{% blocktranslate %}For å bekrefte at dette er riktig, gå til {{ activate_url }}.{% endblocktranslate %}{% endif %}{% endautoescape %}{% endblock content %}
