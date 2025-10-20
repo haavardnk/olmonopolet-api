@@ -1,6 +1,5 @@
 from beers.models import Badge, Beer, Release, Stock, Store, WrongMatch
 from django.contrib.auth.models import User
-from django.db.models import Avg, Count
 from drf_dynamic_fields import DynamicFieldsMixin
 from rest_framework import serializers
 
@@ -9,22 +8,9 @@ from .utils import parse_bool
 
 class BeerSerializer(DynamicFieldsMixin, serializers.ModelSerializer):
     url = serializers.HyperlinkedIdentityField(view_name="beer-detail")
-    app_rating = serializers.SerializerMethodField("get_app_rating")
     badges = serializers.SerializerMethodField("get_badges")
     stock = serializers.SerializerMethodField("get_stock")
     all_stock = serializers.SerializerMethodField("get_all_stock")
-
-    def get_app_rating(self, beer):
-        ci = (
-            User.objects.filter(checkin__beer=beer)
-            .annotate(
-                user_rating=Avg("checkin__rating"), user_count=Count("checkin__rating")
-            )
-            .aggregate(rating=Avg("user_rating"), count=Count("user_rating"))
-        )
-
-        serializer = AppRatingSerializer(instance=ci)
-        return serializer.data
 
     def get_badges(self, beer):
         ci = Badge.objects.filter(beer=beer)
@@ -86,7 +72,6 @@ class BeerSerializer(DynamicFieldsMixin, serializers.ModelSerializer):
             "vmp_updated",
             "untpd_updated",
             "created_at",
-            "app_rating",
             "badges",
             "stock",
             "all_stock",
