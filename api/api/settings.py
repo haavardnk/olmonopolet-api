@@ -31,7 +31,6 @@ INSTALLED_APPS = [
     "beers",
     "notifications",
     "corsheaders",
-    "anymail",
 ]
 
 SITE_ID = 1
@@ -76,16 +75,6 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = "api.wsgi.application"
-
-
-ANYMAIL = {
-    "MAILGUN_API_KEY": os.getenv("MAILGUN_API_KEY"),
-    "MAILGUN_SENDER_DOMAIN": os.getenv("MAILGUN_SENDER_DOMAIN"),
-    "MAILGUN_API_URL": os.getenv("MAILGUN_API_URL"),
-}
-EMAIL_BACKEND = "anymail.backends.mailgun.EmailBackend"
-DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL")
-SERVER_EMAIL = os.getenv("SERVER_EMAIL")
 
 DEFAULT_AUTO_FIELD = "django.db.models.AutoField"
 
