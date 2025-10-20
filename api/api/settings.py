@@ -29,7 +29,6 @@ INSTALLED_APPS = [
     "django_hosts",
     "django_admin_shell",
     "beers",
-    "notifications",
     "corsheaders",
 ]
 
