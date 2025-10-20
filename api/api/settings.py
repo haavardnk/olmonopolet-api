@@ -1,6 +1,7 @@
-import os
 import json
+import os
 from pathlib import Path
+
 import sentry_sdk
 from sentry_sdk.integrations.django import DjangoIntegration
 
@@ -27,17 +28,9 @@ INSTALLED_APPS = [
     "django_extensions",
     "django_hosts",
     "django_admin_shell",
-    "accounts",
     "beers",
     "notifications",
     "corsheaders",
-    "allauth",
-    "allauth.account",
-    "allauth.socialaccount",
-    "allauth.socialaccount.providers.untappd",
-    "allauth.socialaccount.providers.apple",
-    "allauth.socialaccount.providers.google",
-    "allauth.headless",
     "anymail",
 ]
 
@@ -45,7 +38,6 @@ SITE_ID = 1
 
 AUTHENTICATION_BACKENDS = [
     "django.contrib.auth.backends.ModelBackend",
-    "allauth.account.auth_backends.AuthenticationBackend",
 ]
 
 MIDDLEWARE = [
@@ -53,7 +45,6 @@ MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "corsheaders.middleware.CorsMiddleware",
-    "allauth.account.middleware.AccountMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
@@ -86,56 +77,6 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "api.wsgi.application"
 
-AUTH_URL = os.getenv("AUTH_URL", "http://auth.localhost:8000")
-HEADLESS_TOKEN_STRATEGY = "api.token.AccessTokenStrategy"
-HEADLESS_ONLY = True
-HEADLESS_FRONTEND_URLS = {
-    "account_confirm_email": AUTH_URL + "/confirm-email/{key}",
-    "account_reset_password": AUTH_URL + "/password/reset",
-    "account_reset_password_from_key": AUTH_URL + "/password/reset/key/{key}",
-}
-ACCOUNT_EMAIL_REQUIRED = True
-ACCOUNT_EMAIL_VERIFICATION = "optional"
-ACCOUNT_AUTHENTICATION_METHOD = "email"
-ACCOUNT_SESSION_REMEMBER = True
-ACCOUNT_EMAIL_CONFIRMATION_ANONYMOUS_REDIRECT_URL = "/email-confirmed"
-ACCOUNT_EMAIL_CONFIRMATION_AUTHENTICATED_REDIRECT_URL = "/email-confirmed"
-ACCOUNT_EMAIL_CONFIRMATION_EXPIRE_DAYS = 1000
-SOCIALACCOUNT_EMAIL_AUTHENTICATION = True
-SOCIALACCOUNT_EMAIL_AUTHENTICATION_AUTO_CONNECT = True
-SOCIALACCOUNT_STORE_TOKENS = True
-SOCIALACCOUNT_PROVIDERS = {
-    "untappd": {
-        "USER_AGENT": "django:Beermonopoly",
-    },
-    "apple": {
-        "APPS": [
-            {
-                "client_id": os.getenv("APPLE_AUTH_CLIENT_ID_APPLE"),
-                "secret": os.getenv("APPLE_AUTH_SECRET"),
-                "key": os.getenv("APPLE_AUTH_KEY"),
-                "settings": {
-                    "certificate_key": os.getenv("APPLE_AUTH_CERTIFICATE_KEY"),
-                    "hidden": True,
-                },
-            },
-            {
-                "client_id": os.getenv("APPLE_AUTH_CLIENT_ID_ANDROID"),
-                "secret": os.getenv("APPLE_AUTH_SECRET"),
-                "key": os.getenv("APPLE_AUTH_KEY"),
-                "settings": {
-                    "certificate_key": os.getenv("APPLE_AUTH_CERTIFICATE_KEY"),
-                },
-            },
-        ]
-    },
-    "google": {
-        "AUTH_PARAMS": {
-            "access_type": "offline",
-        },
-        "OAUTH_PKCE_ENABLED": True,
-    },
-}
 
 ANYMAIL = {
     "MAILGUN_API_KEY": os.getenv("MAILGUN_API_KEY"),

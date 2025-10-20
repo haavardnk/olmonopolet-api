@@ -1,85 +1,77 @@
-from django.core.management import call_command
 from io import StringIO
+
+from django.core.management import call_command
+
 from beers.models import Beer
 
 
-def update_beers_from_vmp():
+def update_beers_from_vmp() -> str:
     out = StringIO()
     call_command("update_beers_from_vmp", stdout=out)
     return out.getvalue()
 
 
-def match_untpd():
+def match_untpd() -> str:
     out = StringIO()
     call_command("match_untpd_brute", stdout=out)
     return out.getvalue()
 
 
-def match_untpd_scrape(**kwargs):
+def match_untpd_scrape(**kwargs) -> str:
     calls = kwargs.get("calls", 50)
     out = StringIO()
     call_command("match_untpd_scrape", calls, stdout=out)
     return out.getvalue()
 
 
-def update_beers_from_untpd():
+def update_beers_from_untpd() -> str:
     out = StringIO()
     call_command("update_beers_from_untpd", stdout=out)
     return out.getvalue()
 
 
-def update_beers_from_untpd_scrape(**kwargs):
+def update_beers_from_untpd_scrape(**kwargs) -> str:
     calls = kwargs.get("calls", 50)
     out = StringIO()
     call_command("update_beers_from_untpd_scrape", calls, stdout=out)
     return out.getvalue()
 
 
-def update_details_from_vmp(calls):
+def update_details_from_vmp(calls: int) -> str:
     out = StringIO()
     call_command("update_details_from_vmp", calls, stdout=out)
     return out.getvalue()
 
 
-def update_stock_from_vmp(stores):
+def update_stock_from_vmp(stores: int) -> str:
     out = StringIO()
     call_command("update_stock_from_vmp", stores, stdout=out)
     return out.getvalue()
 
 
-def update_stores_from_vmp():
+def update_stores_from_vmp() -> str:
     out = StringIO()
     call_command("update_stores_from_vmp", stdout=out)
     return out.getvalue()
 
 
-def smart_update_untappd(**kwargs):
-    access_token = kwargs.get("token", None)
-
-    # Match if unmatched exists, else update items
+def smart_update_untappd() -> str:
     beers = Beer.objects.filter(
         untpd_id__isnull=True, match_manually=False, active=True
     )
     out = StringIO()
 
     if beers:
-        if access_token is not None:
-            call_command("match_untpd_brute", access_token, stdout=out)
-        else:
-            call_command("match_untpd_brute", stdout=out)
+        call_command("match_untpd_brute", stdout=out)
     else:
-        if access_token is not None:
-            call_command("update_beers_from_untpd", access_token, stdout=out)
-        else:
-            call_command("update_beers_from_untpd", stdout=out)
+        call_command("update_beers_from_untpd", stdout=out)
 
     return out.getvalue()
 
 
-def smart_update_untappd_scrape(**kwargs):
+def smart_update_untappd_scrape(**kwargs) -> str:
     calls = kwargs.get("calls", 50)
 
-    # Match if unmatched exists, else update items
     beers = Beer.objects.filter(
         untpd_id__isnull=True, match_manually=False, active=True
     )
@@ -93,7 +85,7 @@ def smart_update_untappd_scrape(**kwargs):
     return out.getvalue()
 
 
-def get_users_friendlist(user=None, full=False):
+def get_users_friendlist(user=None, full=False) -> str:
     out = StringIO()
 
     if user is not None:
@@ -104,46 +96,31 @@ def get_users_friendlist(user=None, full=False):
     return out.getvalue()
 
 
-def deactivate_inactive(days):
+def deactivate_inactive(days: int) -> str:
     out = StringIO()
     call_command("deactivate_inactive", days, stdout=out)
     return out.getvalue()
 
 
-def get_unreleased_beers_from_vmp():
+def get_unreleased_beers_from_vmp() -> str:
     out = StringIO()
     call_command("get_unreleased_beers_from_vmp", stdout=out)
     return out.getvalue()
 
 
-def get_user_checkins(user, max_id=None):
-    out = StringIO()
-    if max_id:
-        call_command("get_user_checkins", user, max_id=max_id, stdout=out)
-    else:
-        call_command("get_user_checkins", user, stdout=out)
-    return out.getvalue()
-
-
-def get_all_users_last_checkins(loops):
-    out = StringIO()
-    call_command("get_all_users_last_checkins", loops, stdout=out)
-    return out.getvalue()
-
-
-def remove_match_manually():
+def remove_match_manually() -> str:
     out = StringIO()
     call_command("remove_match_manually", stdout=out)
     return out.getvalue()
 
 
-def create_badges_untpd():
+def create_badges_untpd() -> str:
     out = StringIO()
     call_command("create_badges_untpd", stdout=out)
     return out.getvalue()
 
 
-def create_badges_custom(products, badge_text, badge_type):
+def create_badges_custom(products: list[int], badge_text: str, badge_type: str) -> str:
     out = StringIO()
     call_command(
         "create_badges_custom",
@@ -155,7 +132,7 @@ def create_badges_custom(products, badge_text, badge_type):
     return out.getvalue()
 
 
-def remove_badges(badge_type):
+def remove_badges(badge_type: str) -> str:
     out = StringIO()
     call_command(
         "remove_badges",
@@ -165,7 +142,9 @@ def remove_badges(badge_type):
     return out.getvalue()
 
 
-def add_release(name, products, badge_text, badge_type, days):
+def add_release(
+    name: str, products: list[int], badge_text: str, badge_type: str, days: int
+) -> str:
     out = StringIO()
     call_command(
         "add_release",
@@ -179,19 +158,7 @@ def add_release(name, products, badge_text, badge_type, days):
     return out.getvalue()
 
 
-def update_checkin_matches(limit):
-    out = StringIO()
-    call_command("update_checkin_matches", limit, stdout=out)
-    return out.getvalue()
-
-
-def get_all_users_wishlist():
-    out = StringIO()
-    call_command("get_all_users_wishlist", stdout=out)
-    return out.getvalue()
-
-
-def create_release(name, products):
+def create_release(name: str, products: list[int]) -> str:
     out = StringIO()
     call_command(
         "create_release",
@@ -199,10 +166,4 @@ def create_release(name, products):
         products=products,
         stdout=out,
     )
-    return out.getvalue()
-
-
-def check_missing_checkins():
-    out = StringIO()
-    call_command("check_missing_checkins", stdout=out)
     return out.getvalue()

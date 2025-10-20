@@ -1,5 +1,5 @@
 version = 1
-revision = 2
+revision = 3
 requires-python = ">=3.12"
 
 [[package]]
@@ -149,7 +149,6 @@ dependencies = [
     { name = "cryptography" },
     { name = "django" },
     { name = "django-admin-shell" },
-    { name = "django-allauth" },
     { name = "django-anymail" },
     { name = "django-cors-headers" },
     { name = "django-dirtyfields" },
@@ -192,7 +191,6 @@ requires-dist = [
     { name = "cryptography", specifier = ">=43.0.3" },
     { name = "django", specifier = ">=4.2.16" },
     { name = "django-admin-shell", specifier = ">=2.0.1" },
-    { name = "django-allauth", specifier = ">=65.1.0" },
     { name = "django-anymail", specifier = ">=12.0" },
     { name = "django-cors-headers", specifier = ">=4.5.0" },
     { name = "django-dirtyfields", specifier = ">=1.9.3" },
@@ -528,16 +526,6 @@ sdist = { url = "https://files.pythonhosted.org/packages/84/42/89ae1259bd2b277cc
 wheels = [
     { url = "https://files.pythonhosted.org/packages/f1/a8/5311f87cff641ee76b7e70609360eab1e9c3c05f24a3af32fbff2f612de0/django_admin_shell-2.0.1-py2.py3-none-any.whl", hash = "sha256:b129e282ebd581c2099c0504edf081259728b3a504b40c5784d0457b8cb41470", size = 283648, upload-time = "2023-11-20T06:58:59.067Z" },
 ]
-
-[[package]]
-name = "django-allauth"
-version = "65.3.1"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "asgiref" },
-    { name = "django" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/20/73/3a24b32df7046c5106846c0cfb3309033e2ebe00b08dfbf64c883add253a/django_allauth-65.3.1.tar.gz", hash = "sha256:e02e951b71a2753a746459f2efa114c7c72bf2cef6887dbe8607a577c0350587", size = 1547530, upload-time = "2024-12-25T21:07:46.03Z" }
 
 [[package]]
 name = "django-anymail"
