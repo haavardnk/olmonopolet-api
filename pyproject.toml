@@ -3,7 +3,7 @@ name = "beermonopoly-api"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = "==3.13.*"
 dependencies = [
     "beautifulsoup4>=4.12.3",
     "blessed>=1.20.0",
