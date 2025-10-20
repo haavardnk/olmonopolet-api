@@ -8,9 +8,17 @@ from sentry_sdk.integrations.django import DjangoIntegration
 BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "dummykey")
 DEBUG = int(os.getenv("DEBUG_VALUE", 1))
+DEFAULT_AUTO_FIELD = "django.db.models.AutoField"
+
+
 ALLOWED_HOSTS = os.getenv(
     "DJANGO_ALLOWED_HOSTS", "api.localhost,auth.localhost,localhost"
 ).split(",")
+ROOT_URLCONF = "api.urls"
+ROOT_HOSTCONF = "api.hosts"
+DEFAULT_HOST = "api"
+WSGI_APPLICATION = "api.wsgi.application"
+
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -32,12 +40,6 @@ INSTALLED_APPS = [
     "corsheaders",
 ]
 
-SITE_ID = 1
-
-AUTHENTICATION_BACKENDS = [
-    "django.contrib.auth.backends.ModelBackend",
-]
-
 MIDDLEWARE = [
     "django_hosts.middleware.HostsRequestMiddleware",
     "django.middleware.security.SecurityMiddleware",
@@ -51,9 +53,32 @@ MIDDLEWARE = [
     "django_hosts.middleware.HostsResponseMiddleware",
 ]
 
-ROOT_URLCONF = "api.urls"
-ROOT_HOSTCONF = "api.hosts"
-DEFAULT_HOST = "api"
+
+DATABASES = {
+    "default": {
+        "ENGINE": "django.db.backends.{}".format(
+            os.getenv("DATABASE_ENGINE", "postgresql")
+        ),
+        "NAME": os.getenv("DATABASE_NAME", "beerdb"),
+        "USER": os.getenv("DATABASE_USERNAME", "beer"),
+        "PASSWORD": os.getenv("DATABASE_PASSWORD", "123123"),
+        "HOST": os.getenv("DATABASE_HOST", "127.0.0.1"),
+        "PORT": os.getenv("DATABASE_PORT", 5432),
+        "OPTIONS": json.loads(os.getenv("DATABASE_OPTIONS", "{}")),
+    }
+}
+
+
+SITE_ID = 1
+AUTHENTICATION_BACKENDS = [
+    "django.contrib.auth.backends.ModelBackend",
+]
+AUTH_PASSWORD_VALIDATORS = [
+    {
+        "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
+    },
+]
+
 
 TEMPLATES = [
     {
@@ -73,40 +98,45 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = "api.wsgi.application"
-
-DEFAULT_AUTO_FIELD = "django.db.models.AutoField"
-
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.{}".format(
-            os.getenv("DATABASE_ENGINE", "postgresql")
-        ),
-        "NAME": os.getenv("DATABASE_NAME", "beerdb"),
-        "USER": os.getenv("DATABASE_USERNAME", "beer"),
-        "PASSWORD": os.getenv("DATABASE_PASSWORD", "123123"),
-        "HOST": os.getenv("DATABASE_HOST", "127.0.0.1"),
-        "PORT": os.getenv("DATABASE_PORT", 5432),
-        "OPTIONS": json.loads(os.getenv("DATABASE_OPTIONS", "{}")),
-    }
-}
-
-AUTH_PASSWORD_VALIDATORS = [
-    {
-        "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
-    },
-]
-
-LANGUAGE_CODE = "en-us"
-
-TIME_ZONE = "Europe/Paris"
-
-USE_I18N = True
-
-USE_TZ = True
 
 STATIC_ROOT = "/static2"
 STATIC_URL = "/static2/"
+
+
+LANGUAGE_CODE = "en-us"
+TIME_ZONE = "Europe/Paris"
+USE_I18N = True
+USE_TZ = True
+
+
+CORS_ALLOWED_ORIGINS = [
+    "https://www.vinmonopolet.no",
+    "https://app.vinmonopolet.no",
+    "https://olmonopolet.app",
+    "https://www.olmonopolet.app",
+    "http://localhost:5173",
+]
+CORS_ALLOW_METHODS = [
+    "GET",
+]
+CSRF_TRUSTED_ORIGINS = [
+    "https://api.beermonopoly.com",
+    "https://api.olmonopolet.app",
+    "https://auth.beermonopoly.com",
+]
+
+
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": (
+        "rest_framework.authentication.SessionAuthentication",
+        "rest_framework.authentication.TokenAuthentication",
+    ),
+    "DEFAULT_RENDERER_CLASSES": [
+        "rest_framework.renderers.JSONRenderer",
+    ],
+    "DEFAULT_FILTER_BACKENDS": ("django_filters.rest_framework.DjangoFilterBackend",),
+}
+
 
 Q_CLUSTER = {
     "name": "beerapi",
@@ -129,32 +159,6 @@ Q_CLUSTER = {
     },
 }
 
-CORS_ALLOWED_ORIGINS = [
-    "https://www.vinmonopolet.no",
-    "https://app.vinmonopolet.no",
-    "https://olmonopolet.app",
-    "https://www.olmonopolet.app",
-    "http://localhost:5173",
-]
-CORS_ALLOW_METHODS = [
-    "GET",
-]
-CSRF_TRUSTED_ORIGINS = [
-    "https://api.beermonopoly.com",
-    "https://api.olmonopolet.app",
-    "https://auth.beermonopoly.com",
-]
-
-REST_FRAMEWORK = {
-    "DEFAULT_AUTHENTICATION_CLASSES": (
-        "rest_framework.authentication.SessionAuthentication",
-        "rest_framework.authentication.TokenAuthentication",
-    ),
-    "DEFAULT_RENDERER_CLASSES": [
-        "rest_framework.renderers.JSONRenderer",
-    ],
-    "DEFAULT_FILTER_BACKENDS": ("django_filters.rest_framework.DjangoFilterBackend",),
-}
 
 NOTEBOOK_ARGUMENTS = [
     "--ip",
@@ -164,11 +168,11 @@ NOTEBOOK_ARGUMENTS = [
     "--allow-root",
     "--no-browser",
 ]
-
 IPYTHON_ARGUMENTS = [
     "--ext",
     "django_extensions.management.notebook_extension",
 ]
+
 
 if not DEBUG:
     sentry_sdk.init(
