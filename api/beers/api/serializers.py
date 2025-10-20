@@ -1,18 +1,9 @@
-from rest_framework import serializers
-from beers.models import (
-    Beer,
-    Stock,
-    Store,
-    WrongMatch,
-    Badge,
-    Wishlist,
-    Release,
-    FriendList,
-    Tasted,
-)
+from beers.models import Badge, Beer, Release, Stock, Store, WrongMatch
 from django.contrib.auth.models import User
-from drf_dynamic_fields import DynamicFieldsMixin
 from django.db.models import Avg, Count
+from drf_dynamic_fields import DynamicFieldsMixin
+from rest_framework import serializers
+
 from .utils import parse_bool
 
 
@@ -119,105 +110,6 @@ class BeerSerializer(DynamicFieldsMixin, serializers.ModelSerializer):
         ]
 
 
-class AuthenticatedBeerSerializer(BeerSerializer):
-    user_checked_in = serializers.SerializerMethodField("get_checkins")
-    user_tasted = serializers.SerializerMethodField("get_tasted")
-    friends_checked_in = serializers.SerializerMethodField("get_friends_checkins")
-    user_wishlisted = serializers.SerializerMethodField("get_wishlist")
-
-    def get_checkins(self, beer):
-        ci = User.objects.filter(
-            id=self.context["request"].user.id, checkin__beer=beer
-        ).annotate(rating=Avg("checkin__rating"), count=Count("checkin__rating"))
-        serializer = CheckinSerializer(instance=ci, many=True)
-        return serializer.data
-
-    def get_tasted(self, beer):
-        try:
-            ci = Tasted.objects.get(user=self.context["request"].user, beer=beer)
-            serializer = TastedSerializer(instance=ci)
-        except Tasted().DoesNotExist:
-            return None
-        return serializer.data
-
-    def get_friends_checkins(self, beer):
-        try:
-            friends = FriendList.objects.get(user=self.context["request"].user)
-
-            ci = friends.friend.filter(checkin__beer=beer).annotate(
-                rating=Avg("checkin__rating"), count=Count("checkin__rating")
-            )
-            serializer = FriendCheckinSerializer(instance=ci, many=True)
-        except FriendList.DoesNotExist:
-            return None
-        return serializer.data
-
-    def get_wishlist(self, beer):
-        wishlist = Wishlist.objects.filter(user=self.context["request"].user, beer=beer)
-        if wishlist:
-            return True
-        return False
-
-    class Meta:
-        model = Beer
-        fields = [
-            "url",
-            "vmp_id",
-            "untpd_id",
-            "vmp_name",
-            "untpd_name",
-            "brewery",
-            "country",
-            "product_selection",
-            "price",
-            "volume",
-            "price_per_volume",
-            "abv",
-            "ibu",
-            "alcohol_units",
-            "rating",
-            "checkins",
-            "main_category",
-            "sub_category",
-            "style",
-            "description",
-            "prioritize_recheck",
-            "verified_match",
-            "vmp_url",
-            "untpd_url",
-            "label_hd_url",
-            "label_sm_url",
-            "vmp_updated",
-            "untpd_updated",
-            "created_at",
-            "user_checked_in",
-            "user_tasted",
-            "friends_checked_in",
-            "app_rating",
-            "user_wishlisted",
-            "badges",
-            "stock",
-            "all_stock",
-            "post_delivery",
-            "store_delivery",
-            "year",
-            "fullness",
-            "sweetness",
-            "freshness",
-            "bitterness",
-            "sugar",
-            "acid",
-            "color",
-            "aroma",
-            "taste",
-            "storable",
-            "food_pairing",
-            "raw_materials",
-            "method",
-            "allergens",
-        ]
-
-
 class StockChangeBeerSerializer(BeerSerializer):
     class Meta:
         model = Beer
@@ -242,49 +134,8 @@ class StockChangeBeerSerializer(BeerSerializer):
         ]
 
 
-class AuthenticatedStockChangeBeerSerializer(AuthenticatedBeerSerializer):
-    class Meta:
-        model = Beer
-        fields = [
-            "vmp_id",
-            "vmp_name",
-            "price",
-            "rating",
-            "checkins",
-            "label_sm_url",
-            "main_category",
-            "sub_category",
-            "style",
-            "stock",
-            "abv",
-            "volume",
-            "price_per_volume",
-            "vmp_url",
-            "untpd_url",
-            "untpd_id",
-            "country",
-            "user_checked_in",
-            "user_wishlisted",
-        ]
-
-
 class StockChangeSerializer(serializers.ModelSerializer):
     beer = StockChangeBeerSerializer()
-
-    class Meta:
-        model = Stock
-        fields = [
-            "store",
-            "quantity",
-            "stock_updated",
-            "stocked_at",
-            "unstocked_at",
-            "beer",
-        ]
-
-
-class AuthenticatedStockChangeSerializer(serializers.ModelSerializer):
-    beer = AuthenticatedStockChangeBeerSerializer()
 
     class Meta:
         model = Stock
@@ -310,39 +161,6 @@ class BadgeSerializer(serializers.ModelSerializer):
     class Meta:
         model = Badge
         fields = ["text"]
-
-
-class CheckinSerializer(serializers.ModelSerializer):
-    rating = serializers.FloatField()
-    count = serializers.IntegerField()
-
-    class Meta:
-        model = User
-        fields = ["rating", "count"]
-
-
-class TastedSerializer(serializers.ModelSerializer):
-    rating = serializers.FloatField()
-
-    class Meta:
-        model = Tasted
-        fields = ["rating"]
-
-
-class FriendCheckinSerializer(serializers.ModelSerializer):
-    avatar = serializers.SerializerMethodField()
-    rating = serializers.FloatField()
-    count = serializers.IntegerField()
-
-    class Meta:
-        model = User
-        fields = ["username", "rating", "count", "avatar"]
-
-    def get_avatar(self, instance):
-        avatar = instance.socialaccount_set.all()[0].extra_data["response"]["user"][
-            "user_avatar"
-        ]
-        return avatar
 
 
 class AppRatingSerializer(serializers.ModelSerializer):

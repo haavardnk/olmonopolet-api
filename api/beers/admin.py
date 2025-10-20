@@ -1,18 +1,15 @@
 from django.contrib import admin
+
 from beers.models import (
-    Option,
+    Badge,
     Beer,
     ExternalAPI,
-    Store,
-    Stock,
-    WrongMatch,
-    VmpNotReleased,
-    Checkin,
-    Tasted,
-    Badge,
-    Wishlist,
-    FriendList,
+    Option,
     Release,
+    Stock,
+    Store,
+    VmpNotReleased,
+    WrongMatch,
 )
 
 
@@ -81,91 +78,6 @@ class StoreAdmin(admin.ModelAdmin):
 class StockAdmin(admin.ModelAdmin):
     list_display = ("store", "beer", "quantity", "stock_updated")
     search_fields = ("store__name", "beer__vmp_name")
-
-
-class CheckinBeersInline(admin.TabularInline):
-    model = Checkin.beer.through
-
-
-@admin.register(Checkin)
-class CheckinAdmin(admin.ModelAdmin):
-    inlines = [
-        CheckinBeersInline,
-    ]
-    exclude = ["beer"]
-    list_display = ("checkin_id", "get_beers", "untpd_id", "user")
-    search_fields = (
-        "checkin_id",
-        "untpd_id",
-        "user__username",
-        "beer__vmp_name",
-    )
-
-    def get_beers(self, obj):
-        return "\n".join([p.vmp_name for p in obj.beer.all()])
-
-
-@admin.register(Tasted)
-class Tasted(admin.ModelAdmin):
-    exclude = ["beer"]
-    list_display = (
-        "user",
-        "beer",
-        "get_beer_vmp_id",
-        "get_beer_untpd_id",
-        "rating",
-    )
-    search_fields = (
-        "checkin_id",
-        "untpd_id",
-        "user__username",
-        "beer__vmp_name",
-    )
-
-    @admin.display(description="vmp_id", ordering="beer__vmp_id")
-    def get_beer_vmp_id(self, obj):
-        return obj.beer.vmp_id
-
-    @admin.display(description="untpd_id", ordering="beer__untpd_id")
-    def get_beer_untpd_id(self, obj):
-        return obj.beer.untpd_id
-
-
-class WishlistBeersInline(admin.TabularInline):
-    model = Wishlist.beer.through
-
-
-@admin.register(Wishlist)
-class WishlistAdmin(admin.ModelAdmin):
-    inlines = [
-        WishlistBeersInline,
-    ]
-    exclude = ["beer"]
-    list_display = (
-        "user",
-        "get_beers",
-    )
-
-    def get_beers(self, obj):
-        return "\n".join([p.vmp_name for p in obj.beer.all()])
-
-
-class FriendListFriendsInline(admin.TabularInline):
-    model = FriendList.friend.through
-
-
-@admin.register(FriendList)
-class FriendListAdmin(admin.ModelAdmin):
-    inlines = [
-        FriendListFriendsInline,
-    ]
-    list_display = (
-        "user",
-        "get_friends",
-    )
-
-    def get_friends(self, obj):
-        return "\n".join([f.username for f in obj.friend.all()])
 
 
 @admin.register(Release)
