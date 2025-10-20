@@ -39,5 +39,5 @@ dependencies = [
     "xmltodict>=0.14.2",
 ]
 
-[tool.uv]
-dev-dependencies = ["codecov>=2.1.13", "coverage>=7.6.4"]
+[dependency-groups]
+dev = ["codecov>=2.1.13", "coverage>=7.6.4"]
