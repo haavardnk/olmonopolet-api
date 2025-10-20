@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - "main"
+    tags:
+      - "*"
 
 jobs:
   test:
@@ -44,6 +46,7 @@ jobs:
           fail_ci_if_error: true
   build:
     needs: test
+    if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -61,4 +64,6 @@ jobs:
           context: .
           file: ./Dockerfile
           push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/beermonopoly-api:edge
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/beermonopoly-api:${{ github.ref_name }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/beermonopoly-api:latest
