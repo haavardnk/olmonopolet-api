@@ -10,7 +10,6 @@ dependencies = [
     "cloudscraper25>=2.7.0",
     "cryptography>=43.0.3",
     "django-admin-shell>=2.0.1",
-    "django-anymail>=12.0",
     "django-cors-headers>=4.5.0",
     "django-dirtyfields>=1.9.3",
     "django-extensions>=3.2.3",
