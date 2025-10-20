@@ -1,40 +1,26 @@
-from django.db.models import F, Q, Count
-from django.db.models.functions import Greatest
-from django.contrib.postgres.aggregates import ArrayAgg
-from rest_framework import permissions, filters
-from rest_framework.viewsets import ModelViewSet
-from rest_framework.response import Response
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
-from django_filters.rest_framework import DjangoFilterBackend
 from beers.api.filters import (
-    NullsAlwaysLastOrderingFilter,
     BeerFilter,
+    NullsAlwaysLastOrderingFilter,
     StockChangeFilter,
 )
-from beers.models import (
-    Beer,
-    Stock,
-    Store,
-    WrongMatch,
-    Release,
-    Wishlist,
-    Checkin,
-    Tasted,
-)
-from beers.api.pagination import Pagination, LargeResultPagination
+from beers.api.pagination import LargeResultPagination, Pagination
 from beers.api.serializers import (
     BeerSerializer,
-    AuthenticatedBeerSerializer,
+    ReleaseSerializer,
+    StockChangeSerializer,
     StockSerializer,
     StoreSerializer,
     WrongMatchSerializer,
-    ReleaseSerializer,
-    StockChangeSerializer,
-    AuthenticatedStockChangeSerializer,
 )
-from .utils import parse_bool
+from beers.models import Beer, Release, Stock, Store, WrongMatch
+from django.contrib.postgres.aggregates import ArrayAgg
+from django.db.models import Count, F, Q
+from django.db.models.functions import Greatest
+from django.db.models.manager import BaseManager
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework import filters, permissions
 from rest_framework.renderers import BrowsableAPIRenderer
+from rest_framework.viewsets import ModelViewSet
 
 
 class BrowsableMixin(object):
@@ -46,6 +32,7 @@ class BrowsableMixin(object):
 
 
 class BeerViewSet(BrowsableMixin, ModelViewSet):
+    serializer_class = BeerSerializer
     pagination_class = LargeResultPagination
     permission_classes = [permissions.DjangoModelPermissionsOrAnonReadOnly]
 
@@ -75,76 +62,24 @@ class BeerViewSet(BrowsableMixin, ModelViewSet):
     ]
     filterset_class = BeerFilter
 
-    def get_queryset(self):
+    def get_queryset(self) -> BaseManager[Beer]:
         queryset = Beer.objects.all()
         # Prefetch related objects for serializer speed
         queryset = queryset.prefetch_related(
             "badge_set",
             "stock_set",
-            "tasted_set",
-            "checkin_set",
-            "wishlist_set",
         )
         beers = self.request.query_params.get("beers", None)  # type: ignore[attr-defined]
-        user_checkin = self.request.query_params.get("user_checkin", None)  # type: ignore[attr-defined]
-        user_tasted = self.request.query_params.get("user_tasted", None)  # type: ignore[attr-defined]
-        user_wishlisted = self.request.query_params.get("user_wishlisted", None)  # type: ignore[attr-defined]
+
         if beers is not None:
             beers = list(int(v) for v in beers.split(","))
             queryset = queryset.filter(vmp_id__in=beers)
-        if (
-            user_checkin is not None
-            and parse_bool(user_checkin)
-            and self.request.user
-            and self.request.user.is_authenticated
-        ):
-            queryset = queryset.filter(checkin__user=self.request.user)
-        elif (
-            user_checkin is not None
-            and not parse_bool(user_checkin)
-            and self.request.user
-            and self.request.user.is_authenticated
-        ):
-            queryset = queryset.exclude(checkin__user=self.request.user)
-        if (
-            user_tasted is not None
-            and parse_bool(user_tasted)
-            and self.request.user
-            and self.request.user.is_authenticated
-        ):
-            queryset = queryset.filter(tasted__user=self.request.user)
-        elif (
-            user_tasted is not None
-            and not parse_bool(user_tasted)
-            and self.request.user
-            and self.request.user.is_authenticated
-        ):
-            queryset = queryset.exclude(tasted__user=self.request.user)
-        if (
-            user_wishlisted is not None
-            and parse_bool(user_wishlisted)
-            and self.request.user
-            and self.request.user.is_authenticated
-        ):
-            queryset = queryset.filter(wishlist__user=self.request.user)
-        elif (
-            user_wishlisted is not None
-            and not parse_bool(user_wishlisted)
-            and self.request.user
-            and self.request.user.is_authenticated
-        ):
-            queryset = queryset.exclude(wishlist__user=self.request.user)
 
         return queryset
 
-    def get_serializer_class(self):
-        if self.request.user and self.request.user.is_authenticated:
-            return AuthenticatedBeerSerializer
-        else:
-            return BeerSerializer
-
 
 class StockChangeViewSet(BrowsableMixin, ModelViewSet):
+    serializer_class = StockChangeSerializer
     pagination_class = Pagination
     permission_classes = [permissions.DjangoModelPermissionsOrAnonReadOnly]
     filter_backends = (DjangoFilterBackend,)
@@ -162,12 +97,6 @@ class StockChangeViewSet(BrowsableMixin, ModelViewSet):
             )
         )
         return queryset
-
-    def get_serializer_class(self):
-        if self.request.user and self.request.user.is_authenticated:
-            return AuthenticatedStockChangeSerializer
-        else:
-            return StockChangeSerializer
 
 
 class StoreViewSet(BrowsableMixin, ModelViewSet):
@@ -222,107 +151,3 @@ class ReleaseViewSet(BrowsableMixin, ModelViewSet):
     serializer_class = ReleaseSerializer
     pagination_class = Pagination
     permission_classes = [permissions.AllowAny]
-
-
-@api_view(["POST"])
-@permission_classes([IsAuthenticated])
-def get_checked_in_styles(request):
-    try:
-        user = request.user
-        styles = list(
-            Checkin.objects.filter(user=user)
-            .order_by("style")
-            .exclude(style__isnull=True)
-            .values_list("style", flat=True)
-            .distinct()
-        )
-
-        data = {"checked_in_styles": styles}
-        return Response(data, status=200)
-    except Exception as e:
-        message = {"message": "An error occurred", "error": str(e)}
-        return Response(message, status=500)
-
-
-@api_view(["POST", "DELETE"])
-@permission_classes([IsAuthenticated])
-def add_remove_tasted(request):
-    user = request.user
-    beer_id = request.query_params.get("beer_id", None)
-    rating = request.query_params.get("rating", None)
-
-    if beer_id is None:
-        message = {"message": "beer_id missing"}
-        return Response(message, status=400)
-
-    beers = []
-    beers.append(Beer.objects.get(vmp_id=beer_id))
-    if beers[0].untpd_id:
-        beers = Beer.objects.filter(untpd_id=beers[0].untpd_id)
-    if request.method == "POST":
-        try:
-            for beer in beers:
-                tasted, _ = Tasted.objects.get_or_create(user=user, beer=beer)
-                tasted.rating = rating
-                tasted.save()
-            message = {
-                "message": f"{beer.vmp_name} marked as tasted with rating {rating}"
-            }
-            return Response(message, status=200)
-        except Exception as e:
-            message = {"message": str(e)}
-            return Response(message, status=500)
-
-    elif request.method == "DELETE":
-        try:
-            for beer in beers:
-                Tasted.objects.get(user=user, beer=beer).delete()
-            message = {"message": f"{beer.vmp_name} unmarked as tasted"}
-            return Response(message, status=200)
-        except Exception as e:
-            message = {"message": str(e)}
-            return Response(message, status=500)
-
-
-@api_view(["POST"])
-@permission_classes([IsAuthenticated])
-def add_wishlist(request):
-    beer_id = request.query_params.get("beer_id", None)
-    if beer_id is not None:
-        try:
-            beer = Beer.objects.get(vmp_id=beer_id)
-            wishlist, _ = Wishlist.objects.get_or_create(user=request.user)
-            if beer not in wishlist.beer.all():
-                wishlist.beer.add(beer)
-                message = {"message": "Beer added to wishlist"}
-            else:
-                message = {"message": "Beer already in wishlist"}
-            return Response(message, status=200)
-        except Exception as e:
-            message = {"message": "An error occurred", "error": str(e)}
-            return Response(message, status=500)
-    else:
-        message = {"message": "beer_id missing"}
-        return Response(message, status=400)
-
-
-@api_view(["POST"])
-@permission_classes([IsAuthenticated])
-def remove_wishlist(request):
-    beer_id = request.query_params.get("beer_id", None)
-    if beer_id is not None:
-        try:
-            beer = Beer.objects.get(vmp_id=beer_id)
-            wishlist, _ = Wishlist.objects.get_or_create(user=request.user)
-            if beer in wishlist.beer.all():
-                wishlist.beer.remove(beer)
-                message = {"message": "Beer removed from wishlist"}
-            else:
-                message = {"message": "Beer not in wishlist"}
-            return Response(message, status=200)
-        except Exception as e:
-            message = {"message": "An error occurred", "error": str(e)}
-            return Response(message, status=500)
-    else:
-        message = {"message": "beer_id missing"}
-        return Response(message, status=400)

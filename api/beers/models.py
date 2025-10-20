@@ -1,9 +1,8 @@
 import requests
-from django.db import models
-from django.core.validators import MinValueValidator, MaxValueValidator, URLValidator
-from django.db.models.deletion import CASCADE
-from django.contrib.auth.models import User
 from dirtyfields import DirtyFieldsMixin
+from django.core.validators import MaxValueValidator, MinValueValidator, URLValidator
+from django.db import models
+from django.db.models.deletion import CASCADE
 
 
 class Option(models.Model):
@@ -191,7 +190,6 @@ class WrongMatch(models.Model):
             pass
 
         if self.accept_change and suggested_url != self.beer.untpd_url:
-            Checkin.objects.filter(beer=self.beer).delete()
             self.beer.untpd_url = suggested_url
             self.beer.untpd_id = int(suggested_url.split("/")[-1])
             self.beer.prioritize_recheck = True
@@ -219,32 +217,6 @@ class VmpNotReleased(models.Model):
     id = models.IntegerField(primary_key=True)
 
 
-class Checkin(models.Model):
-    checkin_id = models.IntegerField(primary_key=True)
-    untpd_id = models.IntegerField(blank=True, null=True)
-    user = models.ForeignKey(User, on_delete=CASCADE)
-    beer = models.ManyToManyField(Beer)
-    rating = models.FloatField(
-        validators=[MinValueValidator(0), MaxValueValidator(5)], blank=True, null=True
-    )
-    name = models.CharField(max_length=200, blank=True, null=True)
-    style = models.CharField(max_length=50, blank=True, null=True)
-    abv = models.FloatField(blank=True, null=True)
-    checkin_url = models.CharField(
-        max_length=250, validators=[URLValidator()], blank=True, null=True
-    )
-    checkin_date = models.DateTimeField(blank=True, null=True)
-    updated = models.DateTimeField(auto_now=True)
-
-
-class Tasted(models.Model):
-    user = models.ForeignKey(User, on_delete=CASCADE)
-    beer = models.ForeignKey(Beer, on_delete=CASCADE)
-    rating = models.FloatField(
-        validators=[MinValueValidator(0), MaxValueValidator(5)], blank=True, null=True
-    )
-
-
 class Badge(models.Model):
     beer = models.ForeignKey(Beer, on_delete=CASCADE)
     text = models.CharField(max_length=100)
@@ -252,16 +224,6 @@ class Badge(models.Model):
 
     def __str__(self):
         return self.text + " - " + self.beer.vmp_name
-
-
-class Wishlist(models.Model):
-    user = models.OneToOneField(User, on_delete=CASCADE, primary_key=True)
-    beer = models.ManyToManyField(Beer)
-
-
-class FriendList(models.Model):
-    user = models.OneToOneField(User, on_delete=CASCADE, primary_key=True)
-    friend = models.ManyToManyField(User, related_name="friends")
 
 
 class Release(models.Model):
