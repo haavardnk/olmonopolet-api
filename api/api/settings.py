@@ -7,9 +7,9 @@ from sentry_sdk.integrations.django import DjangoIntegration
 BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "dummykey")
 DEBUG = int(os.getenv("DEBUG_VALUE", 1))
-ALLOWED_HOSTS = os.getenv("DJANGO_ALLOWED_HOSTS", "api.localhost,auth.localhost").split(
-    ","
-)
+ALLOWED_HOSTS = os.getenv(
+    "DJANGO_ALLOWED_HOSTS", "api.localhost,auth.localhost,localhost"
+).split(",")
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -205,6 +205,7 @@ CORS_ALLOWED_ORIGINS = [
     "https://app.vinmonopolet.no",
     "https://olmonopolet.app",
     "https://www.olmonopolet.app",
+    "http://localhost:5173",
 ]
 CORS_ALLOW_METHODS = [
     "GET",
