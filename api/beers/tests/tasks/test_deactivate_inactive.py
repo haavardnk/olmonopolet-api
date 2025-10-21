@@ -1,12 +1,13 @@
-import pytest
-from django.utils import timezone
 from datetime import timedelta
+
+import pytest
 from beers.models import Beer
 from beers.tasks import deactivate_inactive
+from django.utils import timezone
 
 
 @pytest.mark.django_db
-def test_deactivate_inactive_beer():
+def test_deactivate_inactive_beer() -> None:
     """
     Test that a beer which is no longer on vinmonopolet gets deactivated.
     """
@@ -24,7 +25,7 @@ def test_deactivate_inactive_beer():
 
 
 @pytest.mark.django_db
-def test_active_beer_does_not_get_deactivated():
+def test_active_beer_does_not_get_deactivated() -> None:
     """
     Test that a beer which is active on vinmonopolet does not get deactivated.
     """

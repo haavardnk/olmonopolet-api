@@ -1,8 +1,8 @@
 import cloudscraper25
 import xmltodict
 from beers.models import Beer, ExternalAPI, VmpNotReleased
-from django.utils import timezone
 from django.core.management.base import BaseCommand
+from django.utils import timezone
 
 
 def call_api(url):

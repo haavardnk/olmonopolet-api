@@ -1,7 +1,7 @@
 import pytest
 import responses
 import xmltodict
-from beers.models import Beer, Store, Stock, ExternalAPI
+from beers.models import Beer, ExternalAPI, Stock, Store
 from beers.tasks import update_stock_from_vmp
 
 

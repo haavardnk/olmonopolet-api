@@ -1,4 +1,8 @@
+from __future__ import annotations
+
 from django.contrib import admin
+from django.db.models import QuerySet
+from django.http import HttpRequest
 
 from beers.models import (
     Badge,
@@ -37,7 +41,6 @@ class BeerAdmin(admin.ModelAdmin):
         "style",
     )
     ordering = ("-created_at",)
-
     list_editable = (
         "match_manually",
         "active",
@@ -50,7 +53,7 @@ class MatchManually(Beer):
 
 
 @admin.register(MatchManually)
-class MatchManallyAdmin(BeerAdmin):
+class MatchManuallyAdmin(BeerAdmin):
     list_display = (
         "vmp_name",
         "untpd_name",
@@ -64,7 +67,7 @@ class MatchManallyAdmin(BeerAdmin):
         "untpd_url",
     )
 
-    def get_queryset(self, request):
+    def get_queryset(self, request: HttpRequest) -> QuerySet[Beer]:
         return self.model.objects.filter(match_manually=True, active=True)
 
 

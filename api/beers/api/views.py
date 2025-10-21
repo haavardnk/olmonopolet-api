@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from beers.api.filters import (
     BeerFilter,
     NullsAlwaysLastOrderingFilter,
@@ -23,19 +25,19 @@ from rest_framework.renderers import BrowsableAPIRenderer
 from rest_framework.viewsets import ModelViewSet
 
 
-class BrowsableMixin(object):
-    def get_renderers(self):
-        rends = self.renderer_classes  # type: ignore
-        if self.request.user:  # type: ignore
-            rends.append(BrowsableAPIRenderer)
-        return [renderer() for renderer in rends]
+class BrowsableMixin:
+    def get_renderers(self) -> list:
+        renderers = list(getattr(self, "renderer_classes", []))
+        request = getattr(self, "request", None)
+        if request and getattr(request, "user", None):
+            renderers.append(BrowsableAPIRenderer)
+        return [renderer() for renderer in renderers]
 
 
 class BeerViewSet(BrowsableMixin, ModelViewSet):
     serializer_class = BeerSerializer
     pagination_class = LargeResultPagination
     permission_classes = [permissions.DjangoModelPermissionsOrAnonReadOnly]
-
     filter_backends = (
         filters.SearchFilter,
         NullsAlwaysLastOrderingFilter,
@@ -64,16 +66,12 @@ class BeerViewSet(BrowsableMixin, ModelViewSet):
 
     def get_queryset(self) -> BaseManager[Beer]:
         queryset = Beer.objects.all()
-        # Prefetch related objects for serializer speed
-        queryset = queryset.prefetch_related(
-            "badge_set",
-            "stock_set",
-        )
-        beers = self.request.query_params.get("beers", None)  # type: ignore[attr-defined]
+        queryset = queryset.prefetch_related("badge_set", "stock_set")
 
+        beers = getattr(self.request, "query_params", {}).get("beers")
         if beers is not None:
-            beers = list(int(v) for v in beers.split(","))
-            queryset = queryset.filter(vmp_id__in=beers)
+            beer_ids = [int(v) for v in beers.split(",")]
+            queryset = queryset.filter(vmp_id__in=beer_ids)
 
         return queryset
 
@@ -85,8 +83,8 @@ class StockChangeViewSet(BrowsableMixin, ModelViewSet):
     filter_backends = (DjangoFilterBackend,)
     filterset_class = StockChangeFilter
 
-    def get_queryset(self):
-        queryset = (
+    def get_queryset(self) -> BaseManager[Stock]:
+        return (
             Stock.objects.all()
             .exclude(Q(stocked_at=None) & Q(unstocked_at=None))
             .annotate(stock_unstock_at=Greatest("stocked_at", "unstocked_at"))
@@ -96,7 +94,6 @@ class StockChangeViewSet(BrowsableMixin, ModelViewSet):
                 F("stocked_at").desc(nulls_last=True),
             )
         )
-        return queryset
 
 
 class StoreViewSet(BrowsableMixin, ModelViewSet):
@@ -130,24 +127,26 @@ class WrongMatchViewSet(BrowsableMixin, ModelViewSet):
 
 
 class ReleaseViewSet(BrowsableMixin, ModelViewSet):
-    queryset = (
-        Release.objects.filter(active=True)
-        .order_by("-release_date")
-        .prefetch_related("beer")
-        .annotate(
-            product_count=Count("beer", distinct=True),
-            beer_count=Count(
-                "beer", filter=Q(beer__main_category__iexact="Øl"), distinct=True
-            ),
-            cider_count=Count(
-                "beer", filter=Q(beer__main_category__iexact="Sider"), distinct=True
-            ),
-            mead_count=Count(
-                "beer", filter=Q(beer__main_category__iexact="Mjød"), distinct=True
-            ),
-            product_selections=ArrayAgg("beer__product_selection", distinct=True),
-        )
-    )
     serializer_class = ReleaseSerializer
     pagination_class = Pagination
     permission_classes = [permissions.AllowAny]
+
+    def get_queryset(self) -> BaseManager[Release]:
+        return (
+            Release.objects.filter(active=True)
+            .order_by("-release_date")
+            .prefetch_related("beer")
+            .annotate(
+                product_count=Count("beer", distinct=True),
+                beer_count=Count(
+                    "beer", filter=Q(beer__main_category__iexact="Øl"), distinct=True
+                ),
+                cider_count=Count(
+                    "beer", filter=Q(beer__main_category__iexact="Sider"), distinct=True
+                ),
+                mead_count=Count(
+                    "beer", filter=Q(beer__main_category__iexact="Mjød"), distinct=True
+                ),
+                product_selections=ArrayAgg("beer__product_selection", distinct=True),
+            )
+        )

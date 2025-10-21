@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from beers.models import Badge, Beer, Release, Stock, Store, WrongMatch
 from django.contrib.auth.models import User
 from drf_dynamic_fields import DynamicFieldsMixin
@@ -12,33 +14,31 @@ class BeerSerializer(DynamicFieldsMixin, serializers.ModelSerializer):
     stock = serializers.SerializerMethodField("get_stock")
     all_stock = serializers.SerializerMethodField("get_all_stock")
 
-    def get_badges(self, beer):
-        ci = Badge.objects.filter(beer=beer)
-        serializer = BadgeSerializer(instance=ci, many=True)
+    def get_badges(self, beer: Beer):
+        badges_queryset = Badge.objects.filter(beer=beer)
+        serializer = BadgeSerializer(instance=badges_queryset, many=True)
         return serializer.data
 
-    def get_stock(self, beer):
+    def get_stock(self, beer: Beer) -> int | None:
         store = self.context["request"].query_params.get("store")
         if store is not None and len(store.split(",")) < 2:
             try:
-                ci = Stock.objects.get(beer=beer, store=store)
+                stock = Stock.objects.get(beer=beer, store=store)
+                return stock.quantity
             except Stock.DoesNotExist:
                 return None
-        else:
-            return None
-        return ci.quantity
+        return None
 
-    def get_all_stock(self, beer):
+    def get_all_stock(self, beer: Beer):
         all_stock = self.context["request"].query_params.get("all_stock")
         if all_stock and parse_bool(all_stock):
             try:
-                ci = Stock.objects.filter(beer=beer).exclude(quantity=0)
-                serializer = AllStockSerializer(instance=ci, many=True)
+                stock_queryset = Stock.objects.filter(beer=beer).exclude(quantity=0)
+                serializer = AllStockSerializer(instance=stock_queryset, many=True)
+                return serializer.data
             except Stock.DoesNotExist:
                 return None
-        else:
-            return None
-        return serializer.data
+        return None
 
     class Meta:
         model = Beer
@@ -202,11 +202,10 @@ class ReleaseSerializer(DynamicFieldsMixin, serializers.ModelSerializer):
     product_stats = serializers.SerializerMethodField()
     product_selections = serializers.ListField(read_only=True)
 
-    def get_beer_count(self, release):
-        # Set beer_count to product_count for compatibility
+    def get_beer_count(self, release: Release) -> int:
         return getattr(release, "product_count", 0)
 
-    def get_product_stats(self, release):
+    def get_product_stats(self, release: Release) -> dict[str, int]:
         return {
             "product_count": getattr(release, "product_count", 0),
             "beer_count": getattr(release, "beer_count", 0),

@@ -1,23 +1,29 @@
-from rest_framework import filters
-from django.db.models import F
-from django_filters import rest_framework as flt
+from __future__ import annotations
+
 from beers.models import Beer, Stock
-from django.db.models import Q
+from django.db.models import F, Q, QuerySet
+from django.http import HttpRequest
+from django_filters import rest_framework as flt
+from rest_framework import filters
+from rest_framework.views import APIView
 
 
 class NullsAlwaysLastOrderingFilter(filters.OrderingFilter):
-    def filter_queryset(self, request, queryset, view):
+    def filter_queryset(
+        self, request: HttpRequest, queryset: QuerySet[Beer], view: APIView
+    ) -> QuerySet[Beer]:
         ordering = self.get_ordering(request, queryset, view)
 
         if ordering:
-            f_ordering = []
-            for o in ordering:
-                if not o:
+            f_ordering: list = []
+            for field_name in ordering:
+                if not field_name:
                     continue
-                if o[0] == "-":
-                    f_ordering.append(F(o[1:]).desc(nulls_last=True))
+
+                if field_name.startswith("-"):
+                    f_ordering.append(F(field_name[1:]).desc(nulls_last=True))
                 else:
-                    f_ordering.append(F(o).asc(nulls_last=True))
+                    f_ordering.append(F(field_name).asc(nulls_last=True))
 
             return queryset.order_by(*f_ordering)
 
@@ -38,40 +44,52 @@ class BeerFilter(flt.FilterSet):
     release = flt.CharFilter(method="custom_release_filter")
     exclude_allergen = flt.CharFilter(method="custom_allergen_filter")
 
-    def custom_style_filter(self, queryset, name, value):
+    def _build_multi_value_query(self, values: str, field_lookup: str) -> Q:
         query = Q()
-        for val in value.split(","):
-            query |= Q(style__icontains=val)
+        for value in values.split(","):
+            value = value.strip()
+            if value:
+                query |= Q(**{field_lookup: value})
+        return query
+
+    def custom_style_filter(
+        self, queryset: QuerySet[Beer], name: str, value: str
+    ) -> QuerySet[Beer]:
+        query = self._build_multi_value_query(value, "style__icontains")
         return queryset.filter(query).distinct()
 
-    def custom_product_selection_filter(self, queryset, name, value):
-        query = Q()
-        for val in value.split(","):
-            query |= Q(product_selection__iexact=val)
+    def custom_product_selection_filter(
+        self, queryset: QuerySet[Beer], name: str, value: str
+    ) -> QuerySet[Beer]:
+        query = self._build_multi_value_query(value, "product_selection__iexact")
         return queryset.filter(query).distinct()
 
-    def custom_store_filter(self, queryset, name, value):
+    def custom_store_filter(
+        self, queryset: QuerySet[Beer], name: str, value: str
+    ) -> QuerySet[Beer]:
         query = Q()
-        for val in value.split(","):
-            query |= Q(stock__store__exact=int(val)) & ~Q(stock__quantity=0)
+        for store_id in value.split(","):
+            store_id = store_id.strip()
+            if store_id.isdigit():
+                query |= Q(stock__store__exact=int(store_id)) & ~Q(stock__quantity=0)
         return queryset.filter(query).distinct()
 
-    def custom_country_filter(self, queryset, name, value):
-        query = Q()
-        for val in value.split(","):
-            query |= Q(country__iexact=val)
+    def custom_country_filter(
+        self, queryset: QuerySet[Beer], name: str, value: str
+    ) -> QuerySet[Beer]:
+        query = self._build_multi_value_query(value, "country__iexact")
         return queryset.filter(query).distinct()
 
-    def custom_release_filter(self, queryset, name, value):
-        query = Q()
-        for val in value.split(","):
-            query |= Q(release__name__iexact=val)
+    def custom_release_filter(
+        self, queryset: QuerySet[Beer], name: str, value: str
+    ) -> QuerySet[Beer]:
+        query = self._build_multi_value_query(value, "release__name__iexact")
         return queryset.filter(query).distinct()
 
-    def custom_allergen_filter(self, queryset, name, value):
-        query = Q()
-        for val in value.split(","):
-            query |= Q(allergens__icontains=val)
+    def custom_allergen_filter(
+        self, queryset: QuerySet[Beer], name: str, value: str
+    ) -> QuerySet[Beer]:
+        query = self._build_multi_value_query(value, "allergens__icontains")
         return queryset.exclude(query).distinct()
 
     class Meta:
@@ -99,10 +117,12 @@ class BeerFilter(flt.FilterSet):
 class StockChangeFilter(flt.FilterSet):
     store = flt.CharFilter(method="custom_store_filter")
 
-    def custom_store_filter(self, queryset, name, value):
-        query = Q()
-        query |= Q(store__exact=int(value))
-        return queryset.filter(query).distinct()
+    def custom_store_filter(
+        self, queryset: QuerySet[Stock], name: str, value: str
+    ) -> QuerySet[Stock]:
+        if value.isdigit():
+            return queryset.filter(store__exact=int(value)).distinct()
+        return queryset.none()
 
     class Meta:
         model = Stock

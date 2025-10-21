@@ -1,10 +1,15 @@
+from __future__ import annotations
+
+
 def parse_bool(val: str | bool) -> bool:
     if isinstance(val, bool):
         return val
+
     if isinstance(val, str):
-        val = val.strip().lower()
-        if val in ("true", "t", "1"):
+        normalized = val.strip().lower()
+        if normalized in ("true", "t", "1", "yes", "y", "on"):
             return True
-        if val in ("false", "f", "0", "n"):
+        if normalized in ("false", "f", "0", "no", "n", "off", ""):
             return False
-    raise ValueError(f"Invalid truth value: {val}")
+
+    raise ValueError(f"Invalid truth value: {val!r}")
