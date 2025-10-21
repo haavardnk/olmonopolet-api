@@ -17,22 +17,14 @@ def update_beers_from_vmp() -> str:
     return _call_command_with_output("update_beers_from_vmp")
 
 
-def match_untpd() -> str:
-    return _call_command_with_output("match_untpd_brute")
-
-
-def match_untpd_scrape(**kwargs) -> str:
+def match_untappd(**kwargs) -> str:
     calls = kwargs.get("calls", 50)
-    return _call_command_with_output("match_untpd_scrape", calls)
+    return _call_command_with_output("match_untappd", calls)
 
 
-def update_beers_from_untpd() -> str:
-    return _call_command_with_output("update_beers_from_untpd")
-
-
-def update_beers_from_untpd_scrape(**kwargs) -> str:
+def update_beers_from_untappd(**kwargs) -> str:
     calls = kwargs.get("calls", 50)
-    return _call_command_with_output("update_beers_from_untpd_scrape", calls)
+    return _call_command_with_output("update_beers_from_untappd", calls)
 
 
 def update_details_from_vmp(calls: int) -> str:
@@ -47,18 +39,14 @@ def update_stores_from_vmp() -> str:
     return _call_command_with_output("update_stores_from_vmp")
 
 
-def smart_update_untappd_scrape(**kwargs) -> str:
+def smart_update_untappd(**kwargs) -> str:
     calls = kwargs.get("calls", 50)
 
     beers_without_untpd = Beer.objects.filter(
         untpd_id__isnull=True, match_manually=False, active=True
     ).exists()
 
-    command = (
-        "match_untpd_scrape"
-        if beers_without_untpd
-        else "update_beers_from_untpd_scrape"
-    )
+    command = "match_untappd" if beers_without_untpd else "update_beers_from_untappd"
     return _call_command_with_output(command, calls)
 
 
