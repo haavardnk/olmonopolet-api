@@ -189,7 +189,12 @@ class Command(BaseCommand):
             if label_elem:
                 data_image = label_elem.get("data-image")
                 if data_image:
-                    beer.label_hd_url = str(data_image)
+                    beer.label_hd_url = (
+                        str(data_image)
+                        .replace("://", "PLACEHOLDER")
+                        .replace("//", "/")
+                        .replace("PLACEHOLDER", "://")
+                    )
                 img_elem = label_elem.find("img")
                 if img_elem:
                     src = img_elem.get("src")
