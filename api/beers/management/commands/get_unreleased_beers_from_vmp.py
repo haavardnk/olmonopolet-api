@@ -8,6 +8,8 @@ from beers.models import Beer, ExternalAPI, VmpNotReleased
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 
+from api.beers.api.utils import get_or_create_country
+
 
 class Command(BaseCommand):
     def handle(self, *args, **options) -> None:
@@ -72,7 +74,7 @@ class Command(BaseCommand):
         if "main_sub_category" in response:
             beer.sub_category = response["main_sub_category"]["name"]
 
-        beer.country = response["main_country"]["name"]
+        beer.country = get_or_create_country(response["main_country"]["name"])
         beer.volume = float(response["volume"]["value"]) / 100.0
 
         if "price" in response:
@@ -127,4 +129,5 @@ class Command(BaseCommand):
 
     def _calculate_price_per_volume(self, price: float, volume_value: float) -> float:
         volume_in_liters = volume_value / 100.0
+        return price / volume_in_liters
         return price / volume_in_liters

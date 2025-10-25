@@ -77,7 +77,7 @@ class BeerFilter(flt.FilterSet):
     def custom_country_filter(
         self, queryset: QuerySet[Beer], name: str, value: str
     ) -> QuerySet[Beer]:
-        query = self._build_multi_value_query(value, "country__iexact")
+        query = self._build_multi_value_query(value, "country__name__iexact")
         return queryset.filter(query).distinct()
 
     def custom_release_filter(

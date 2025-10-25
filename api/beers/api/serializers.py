@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from beers.models import Badge, Beer, Release, Stock, Store, WrongMatch
+from beers.models import Badge, Beer, Country, Release, Stock, Store, WrongMatch
 from django.contrib.auth.models import User
 from drf_dynamic_fields import DynamicFieldsMixin
 from rest_framework import serializers
@@ -13,6 +13,12 @@ class BeerSerializer(DynamicFieldsMixin, serializers.ModelSerializer):
     badges = serializers.SerializerMethodField("get_badges")
     stock = serializers.SerializerMethodField("get_stock")
     all_stock = serializers.SerializerMethodField("get_all_stock")
+    country = serializers.CharField(
+        source="country.name", read_only=True, allow_null=True
+    )
+    country_code = serializers.CharField(
+        source="country.iso_code", read_only=True, allow_null=True
+    )
 
     def get_badges(self, beer: Beer):
         badges_queryset = Badge.objects.filter(beer=beer)
@@ -50,6 +56,7 @@ class BeerSerializer(DynamicFieldsMixin, serializers.ModelSerializer):
             "untpd_name",
             "brewery",
             "country",
+            "country_code",
             "product_selection",
             "price",
             "volume",
@@ -225,3 +232,9 @@ class ReleaseSerializer(DynamicFieldsMixin, serializers.ModelSerializer):
             "product_selections",
             "beer",
         ]
+
+
+class CountrySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Country
+        fields = ["name", "iso_code"]

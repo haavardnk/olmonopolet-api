@@ -1,12 +1,9 @@
 from __future__ import annotations
 
-from django.contrib import admin
-from django.db.models import QuerySet
-from django.http import HttpRequest
-
 from beers.models import (
     Badge,
     Beer,
+    Country,
     ExternalAPI,
     Option,
     Release,
@@ -15,6 +12,9 @@ from beers.models import (
     VmpNotReleased,
     WrongMatch,
 )
+from django.contrib import admin
+from django.db.models import QuerySet
+from django.http import HttpRequest
 
 
 @admin.register(Beer)
@@ -91,6 +91,12 @@ class ReleaseAdmin(admin.ModelAdmin):
         "release_date",
     )
     ordering = ("-release_date",)
+
+
+@admin.register(Country)
+class CountryAdmin(admin.ModelAdmin):
+    list_display = ("name", "iso_code")
+    search_fields = ("name", "iso_code")
 
 
 admin.site.register(Option)

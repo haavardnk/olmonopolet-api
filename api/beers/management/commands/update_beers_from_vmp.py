@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import cloudscraper25
 import xmltodict
-from beers.api.utils import parse_bool
+from beers.api.utils import get_or_create_country, parse_bool
 from beers.models import Beer, ExternalAPI
 from django.core.management.base import BaseCommand
 from django.utils import timezone
@@ -98,7 +98,7 @@ class Command(BaseCommand):
         if beer_data.get("main_sub_category"):
             beer.sub_category = beer_data["main_sub_category"]["name"]
 
-        beer.country = beer_data["main_country"]["name"]
+        beer.country = get_or_create_country(beer_data["main_country"]["name"])
         beer.price = beer_data["price"]["value"]
         beer.volume = float(beer_data["volume"]["value"]) / 100.0
         beer.price_per_volume = self._calculate_price_per_volume(
