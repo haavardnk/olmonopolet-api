@@ -13,13 +13,27 @@ class Option(models.Model):
         return self.name
 
 
+class Country(models.Model):
+    name = models.CharField(max_length=100, unique=True, primary_key=True)
+    iso_code = models.CharField(max_length=2, blank=True, null=True)
+
+    class Meta:
+        ordering = ["name"]
+        verbose_name_plural = "Countries"
+
+    def __str__(self):
+        return f"{self.name}"
+
+
 class Beer(DirtyFieldsMixin, models.Model):
     # Vinmonopolet info
     vmp_id = models.BigIntegerField(primary_key=True)
     vmp_name = models.CharField(max_length=150)
     main_category = models.CharField(max_length=50, blank=True, null=True)
     sub_category = models.CharField(max_length=50, blank=True, null=True)
-    country = models.CharField(max_length=50, blank=True, null=True)
+    country = models.ForeignKey(
+        Country, on_delete=models.SET_NULL, blank=True, null=True, related_name="beers"
+    )
     price = models.FloatField(blank=True, null=True)
     volume = models.FloatField(blank=True, null=True)
     price_per_volume = models.FloatField(blank=True, null=True)

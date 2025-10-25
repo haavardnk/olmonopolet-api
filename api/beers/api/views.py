@@ -8,13 +8,14 @@ from beers.api.filters import (
 from beers.api.pagination import LargeResultPagination, Pagination
 from beers.api.serializers import (
     BeerSerializer,
+    CountrySerializer,
     ReleaseSerializer,
     StockChangeSerializer,
     StockSerializer,
     StoreSerializer,
     WrongMatchSerializer,
 )
-from beers.models import Beer, Release, Stock, Store, WrongMatch
+from beers.models import Beer, Country, Release, Stock, Store, WrongMatch
 from django.contrib.postgres.aggregates import ArrayAgg
 from django.db.models import Count, F, Q
 from django.db.models.functions import Greatest
@@ -163,3 +164,28 @@ class ReleaseViewSet(BrowsableMixin, ModelViewSet):
                 product_selections=ArrayAgg("beer__product_selection", distinct=True),
             )
         )
+
+
+class CountryViewSet(BrowsableMixin, ModelViewSet):
+    queryset = Country.objects.all().order_by("name")
+    serializer_class = CountrySerializer
+    permission_classes = [permissions.AllowAny]
+    pagination_class = None
+    filter_backends = (filters.SearchFilter, filters.OrderingFilter)
+    search_fields = ["name", "iso_code"]
+    ordering_fields = ["name", "iso_code"]
+    ordering = ["name"]
+
+    @action(detail=False, methods=["get"], url_path="active")
+    def active(self, request):
+        countries = (
+            Country.objects.filter(beers__active=True).distinct().order_by("name")
+        )
+        serializer = self.get_serializer(countries, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=["get"], url_path="unmapped")
+    def unmapped(self, request):
+        countries = Country.objects.filter(iso_code__isnull=True).order_by("name")
+        serializer = self.get_serializer(countries, many=True)
+        return Response(serializer.data)

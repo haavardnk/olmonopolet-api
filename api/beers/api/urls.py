@@ -1,5 +1,6 @@
 from beers.api.views import (
     BeerViewSet,
+    CountryViewSet,
     ReleaseViewSet,
     StockChangeViewSet,
     StockViewSet,
@@ -13,6 +14,7 @@ from rest_framework.routers import DefaultRouter, SimpleRouter
 router = DefaultRouter() if settings.DEBUG else SimpleRouter()
 
 router.register("beers", BeerViewSet, basename="beer")
+router.register("countries", CountryViewSet, basename="country")
 router.register("stores", StoreViewSet, basename="store")
 router.register("stock", StockViewSet, basename="stock")
 router.register("stockchange", StockChangeViewSet, basename="stockchange")

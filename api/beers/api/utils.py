@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from beers.models import Country
+
 
 def parse_bool(val: str | bool) -> bool:
     if isinstance(val, bool):
@@ -13,3 +15,17 @@ def parse_bool(val: str | bool) -> bool:
             return False
 
     raise ValueError(f"Invalid truth value: {val!r}")
+
+
+def get_or_create_country(country_name):
+    if not country_name:
+        return None
+
+    country, created = Country.objects.get_or_create(
+        name=country_name, defaults={"iso_code": None}
+    )
+
+    if created:
+        print(f"New country created: {country_name} - needs ISO mapping in admin")
+
+    return country
