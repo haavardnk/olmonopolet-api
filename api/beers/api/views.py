@@ -21,7 +21,9 @@ from django.db.models.functions import Greatest
 from django.db.models.manager import BaseManager
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, permissions
+from rest_framework.decorators import action
 from rest_framework.renderers import BrowsableAPIRenderer
+from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
 
@@ -74,6 +76,17 @@ class BeerViewSet(BrowsableMixin, ModelViewSet):
             queryset = queryset.filter(vmp_id__in=beer_ids)
 
         return queryset
+
+    @action(detail=False, methods=["get"], url_path="styles")
+    def styles(self, request):
+        styles = (
+            Beer.objects.filter(active=True, style__isnull=False)
+            .exclude(style="")
+            .values_list("style", flat=True)
+            .distinct()
+            .order_by("style")
+        )
+        return Response(list(styles))
 
 
 class StockChangeViewSet(BrowsableMixin, ModelViewSet):
