@@ -102,6 +102,16 @@ class BeerSerializer(DynamicFieldsMixin, serializers.ModelSerializer):
         ]
 
 
+class AllStockSerializer(serializers.ModelSerializer):
+    store_name = serializers.CharField(read_only=True, source="store.name")
+    gps_lat = serializers.FloatField(read_only=True, source="store.gps_lat")
+    gps_long = serializers.FloatField(read_only=True, source="store.gps_long")
+
+    class Meta:
+        model = Stock
+        fields = ["store_name", "quantity", "gps_lat", "gps_long"]
+
+
 class StockChangeBeerSerializer(BeerSerializer):
     class Meta:
         model = Beer
@@ -139,14 +149,6 @@ class StockChangeSerializer(serializers.ModelSerializer):
             "unstocked_at",
             "beer",
         ]
-
-
-class AllStockSerializer(serializers.ModelSerializer):
-    store_name = serializers.CharField(read_only=True, source="store.name")
-
-    class Meta:
-        model = Stock
-        fields = ["store_name", "quantity"]
 
 
 class BadgeSerializer(serializers.ModelSerializer):
