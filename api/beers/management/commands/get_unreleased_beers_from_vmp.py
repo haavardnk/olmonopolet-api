@@ -4,11 +4,10 @@ from typing import Any
 
 import cloudscraper25
 import xmltodict
+from beers.api.utils import get_or_create_country
 from beers.models import Beer, ExternalAPI, VmpNotReleased
 from django.core.management.base import BaseCommand
 from django.utils import timezone
-
-from api.beers.api.utils import get_or_create_country
 
 
 class Command(BaseCommand):
@@ -101,7 +100,7 @@ class Command(BaseCommand):
             "vmp_id": int(response["code"]),
             "vmp_name": response["name"],
             "main_category": response["main_category"]["name"],
-            "country": response["main_country"]["name"],
+            "country": get_or_create_country(response["main_country"]["name"]),
             "volume": volume_value / 100.0,
             "product_selection": response["product_selection"],
             "vmp_url": f"https://www.vinmonopolet.no{response['url']}",
