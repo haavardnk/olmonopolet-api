@@ -234,6 +234,7 @@ class ReleaseSerializer(DynamicFieldsMixin, serializers.ModelSerializer):
             "product_selection",
             "product_selections",
             "beer",
+            "is_christmas_release",
         ]
 
 

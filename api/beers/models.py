@@ -249,3 +249,4 @@ class Release(models.Model):
     active = models.BooleanField(default=True)
     release_date = models.DateTimeField(blank=True, null=True)
     product_selection = models.CharField(max_length=150, blank=True, null=True)
+    is_christmas_release = models.BooleanField(default=False)
