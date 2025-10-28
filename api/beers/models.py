@@ -89,6 +89,9 @@ class Beer(DirtyFieldsMixin, models.Model):
     # Calculated info
     alcohol_units = models.FloatField(blank=True, null=True)
 
+    # Classification
+    is_christmas_beer = models.BooleanField(default=False)
+
     # Server update times
     vmp_updated = models.DateTimeField(blank=True, null=True)
     vmp_details_fetched = models.DateTimeField(blank=True, null=True)

@@ -43,6 +43,7 @@ class BeerFilter(flt.FilterSet):
     abv_low = flt.NumberFilter(field_name="abv", lookup_expr="gte")
     release = flt.CharFilter(method="custom_release_filter")
     exclude_allergen = flt.CharFilter(method="custom_allergen_filter")
+    is_christmas_beer = flt.BooleanFilter(field_name="is_christmas_beer")
 
     def _build_multi_value_query(self, values: str, field_lookup: str) -> Q:
         query = Q()
@@ -111,6 +112,7 @@ class BeerFilter(flt.FilterSet):
             "exclude_allergen",
             "post_delivery",
             "store_delivery",
+            "is_christmas_beer",
         ]
 
 

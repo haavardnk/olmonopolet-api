@@ -99,6 +99,7 @@ class BeerSerializer(DynamicFieldsMixin, serializers.ModelSerializer):
             "raw_materials",
             "method",
             "allergens",
+            "is_christmas_beer",
         ]
 
 
