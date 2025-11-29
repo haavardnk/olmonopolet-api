@@ -134,6 +134,7 @@ class StockChangeBeerSerializer(BeerSerializer):
             "untpd_url",
             "untpd_id",
             "country",
+            "country_code",
         ]
 
 
