@@ -100,6 +100,19 @@ class Beer(DirtyFieldsMixin, models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     active = models.BooleanField(default=True)
 
+    @property
+    def value_score(self) -> float | None:
+        if (
+            self.rating
+            and self.rating > 0
+            and self.price_per_volume
+            and self.price_per_volume > 0
+        ):
+            return (
+                (self.rating**4.8) / ((self.price_per_volume / 100) ** 0.32)
+            ) * 0.0176
+        return None
+
     def __str__(self):
         return self.vmp_name
 
