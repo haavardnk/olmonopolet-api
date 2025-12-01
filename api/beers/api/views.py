@@ -165,6 +165,29 @@ class ReleaseViewSet(BrowsableMixin, ModelViewSet):
             )
         )
 
+    @action(detail=True, methods=["get"], url_path="countries")
+    def countries(self, request, pk=None):
+        release = self.get_object()
+        countries = (
+            Country.objects.filter(beers__in=release.beer.all())
+            .distinct()
+            .order_by("name")
+        )
+        serializer = CountrySerializer(countries, many=True)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=["get"], url_path="styles")
+    def styles(self, request, pk=None):
+        release = self.get_object()
+        styles = (
+            release.beer.filter(style__isnull=False)
+            .exclude(style="")
+            .values_list("style", flat=True)
+            .distinct()
+            .order_by("style")
+        )
+        return Response(list(styles))
+
 
 class CountryViewSet(BrowsableMixin, ModelViewSet):
     queryset = Country.objects.all().order_by("name")
