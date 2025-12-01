@@ -65,6 +65,7 @@ class BeerSerializer(DynamicFieldsMixin, serializers.ModelSerializer):
             "abv",
             "ibu",
             "alcohol_units",
+            "price_per_alcohol_unit",
             "rating",
             "checkins",
             "main_category",

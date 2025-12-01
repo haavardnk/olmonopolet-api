@@ -20,6 +20,10 @@ class NullsAlwaysLastOrderingFilter(filters.OrderingFilter):
                 if not field_name:
                     continue
 
+                clean_field = field_name.lstrip("-")
+                if clean_field == "price_per_alcohol_unit":
+                    queryset = queryset.filter(abv__gte=1)
+
                 if field_name.startswith("-"):
                     f_ordering.append(F(field_name[1:]).desc(nulls_last=True))
                 else:

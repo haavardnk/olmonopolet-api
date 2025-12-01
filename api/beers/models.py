@@ -88,6 +88,7 @@ class Beer(DirtyFieldsMixin, models.Model):
 
     # Calculated info
     alcohol_units = models.FloatField(blank=True, null=True)
+    price_per_alcohol_unit = models.FloatField(blank=True, null=True)
 
     # Classification
     is_christmas_beer = models.BooleanField(default=False)

@@ -55,15 +55,16 @@ class BeerViewSet(BrowsableMixin, ModelViewSet):
         "untpd_id",
     ]
     ordering_fields = [
-        "vmp_name",
-        "brewery",
-        "rating",
-        "price",
-        "created_at",
         "abv",
-        "price_per_volume",
+        "brewery",
         "checkin__rating",
+        "created_at",
+        "price",
+        "price_per_alcohol_unit",
+        "price_per_volume",
+        "rating",
         "tasted__rating",
+        "vmp_name",
     ]
     filterset_class = BeerFilter
 

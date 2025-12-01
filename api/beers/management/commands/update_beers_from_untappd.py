@@ -83,6 +83,8 @@ class Command(BaseCommand):
 
         if beer.volume and beer.abv:
             beer.alcohol_units = (beer.volume * 1000 * beer.abv / 100 * 0.8) / 12
+            if beer.price and beer.alcohol_units > 0:
+                beer.price_per_alcohol_unit = beer.price / beer.alcohol_units
 
         beer.save()
         return True
