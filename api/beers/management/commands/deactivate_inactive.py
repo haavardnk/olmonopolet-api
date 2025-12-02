@@ -28,7 +28,12 @@ class Command(BaseCommand):
 
     def _get_inactive_beers(self, days: int):
         time_threshold = timezone.now() - timedelta(days=days)
-        return Beer.objects.filter(vmp_updated__lte=time_threshold, active=True)
+        recent_threshold = timezone.now() - timedelta(days=10)
+        return Beer.objects.filter(
+            vmp_updated__lte=time_threshold,
+            active=True,
+            created_at__lte=recent_threshold,
+        )
 
     def _deactivate_beers(self, beers) -> int:
         updated_count = beers.update(active=False)
