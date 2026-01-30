@@ -269,6 +269,9 @@ class Release(models.Model):
 class Tasted(models.Model):
     user = models.ForeignKey("auth.User", on_delete=CASCADE)
     beer = models.ForeignKey(Beer, on_delete=CASCADE)
+    rating = models.FloatField(
+        validators=[MinValueValidator(0), MaxValueValidator(5)], blank=True, null=True
+    )
 
     class Meta:
         unique_together = ["user", "beer"]

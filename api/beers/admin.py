@@ -14,8 +14,33 @@ from beers.models import (
     WrongMatch,
 )
 from django.contrib import admin
-from django.db.models import QuerySet
+from django.contrib.auth.admin import UserAdmin
+from django.contrib.auth.models import User
+from django.db.models import Count, QuerySet
 from django.http import HttpRequest
+
+
+class MatchManually(Beer):
+    class Meta:
+        proxy = True
+
+
+class UserWithTasted(User):
+    class Meta:
+        proxy = True
+        verbose_name = "User Tasted"
+        verbose_name_plural = "User Tasteds"
+
+
+class TastedInline(admin.TabularInline):
+    model = Tasted
+    extra = 0
+    fields = ("beer", "rating")
+    readonly_fields = ("beer",)
+    raw_id_fields = ("beer",)
+
+    def has_add_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(Beer)
@@ -34,23 +59,9 @@ class BeerAdmin(admin.ModelAdmin):
         "match_manually",
         "active",
     )
-    search_fields = (
-        "vmp_name",
-        "brewery",
-        "vmp_id",
-        "untpd_id",
-        "style",
-    )
+    list_editable = ("match_manually", "active")
     ordering = ("-created_at",)
-    list_editable = (
-        "match_manually",
-        "active",
-    )
-
-
-class MatchManually(Beer):
-    class Meta:
-        proxy = True
+    search_fields = ("vmp_name", "brewery", "vmp_id", "untpd_id", "style")
 
 
 @admin.register(MatchManually)
@@ -63,10 +74,7 @@ class MatchManuallyAdmin(BeerAdmin):
         "match_manually",
         "active",
     )
-    fields = (
-        "vmp_name",
-        "untpd_url",
-    )
+    fields = ("vmp_name", "untpd_url")
 
     def get_queryset(self, request: HttpRequest) -> QuerySet[Beer]:
         return self.model.objects.filter(match_manually=True, active=True)
@@ -86,11 +94,7 @@ class StockAdmin(admin.ModelAdmin):
 
 @admin.register(Release)
 class ReleaseAdmin(admin.ModelAdmin):
-    list_display = (
-        "name",
-        "active",
-        "release_date",
-    )
+    list_display = ("name", "active", "release_date")
     ordering = ("-release_date",)
 
 
@@ -100,15 +104,39 @@ class CountryAdmin(admin.ModelAdmin):
     search_fields = ("name", "iso_code")
 
 
-@admin.register(Tasted)
-class TastedAdmin(admin.ModelAdmin):
-    list_display = ("user", "beer")
-    search_fields = ("user__username", "beer__vmp_name")
-    raw_id_fields = ("user", "beer")
+admin.site.unregister(User)
 
 
-admin.site.register(Option)
+@admin.register(User)
+class CustomUserAdmin(UserAdmin):
+    pass
+
+
+@admin.register(UserWithTasted)
+class UserWithTastedAdmin(admin.ModelAdmin):
+    list_display = ("username", "email", "tasted_count")
+    search_fields = ("username", "email")
+    fields = ("username", "email")
+    readonly_fields = ("username", "email")
+    inlines = [TastedInline]
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        return qs.annotate(tasted_count=Count("tasted")).filter(tasted_count__gt=0)
+
+    @admin.display(ordering="tasted_count")
+    def tasted_count(self, obj):
+        return obj.tasted_count
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
 admin.site.register(Badge)
 admin.site.register(ExternalAPI)
-admin.site.register(WrongMatch)
+admin.site.register(Option)
 admin.site.register(VmpNotReleased)
+admin.site.register(WrongMatch)

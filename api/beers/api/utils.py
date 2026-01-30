@@ -1,6 +1,61 @@
 from __future__ import annotations
 
+import csv
+import json
+
 from beers.models import Country
+
+
+def extract_checkin_data(row: dict) -> tuple[int, float | None] | None:
+    beer_id = row.get("bid") or row.get("beer_id")
+
+    if not beer_id and (url := row.get("beer_url")):
+        try:
+            beer_id = url.rstrip("/").split("/")[-1]
+        except (AttributeError, IndexError):
+            pass
+
+    if not beer_id:
+        return None
+
+    try:
+        beer_id = int(beer_id)
+    except (ValueError, TypeError):
+        return None
+
+    rating = None
+    if rating_str := row.get("rating_score"):
+        try:
+            rating = float(rating_str)
+            if rating == 0:
+                rating = None
+        except (ValueError, TypeError):
+            pass
+
+    return (beer_id, rating)
+
+
+def parse_untappd_csv(uploaded_file) -> list[tuple[int, float | None]]:
+    decoded = uploaded_file.read().decode("utf-8").splitlines()
+    return [
+        data for row in csv.DictReader(decoded) if (data := extract_checkin_data(row))
+    ]
+
+
+def parse_untappd_json(uploaded_file) -> list[tuple[int, float | None]]:
+    data = json.load(uploaded_file)
+    if not isinstance(data, list):
+        return []
+    return [checkin for item in data if (checkin := extract_checkin_data(item))]
+
+
+def parse_untappd_file(uploaded_file) -> list[tuple[int, float | None]] | None:
+    filename = uploaded_file.name.lower()
+    if filename.endswith(".csv"):
+        return parse_untappd_csv(uploaded_file)
+    if filename.endswith(".json"):
+        return parse_untappd_json(uploaded_file)
+    return None
 
 
 def parse_bool(val: str | bool) -> bool:

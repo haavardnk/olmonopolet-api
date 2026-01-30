@@ -15,6 +15,7 @@ from beers.api.serializers import (
     StoreSerializer,
     WrongMatchSerializer,
 )
+from beers.api.utils import parse_untappd_file
 from beers.models import Beer, Country, Release, Stock, Store, Tasted, WrongMatch
 from django.contrib.postgres.aggregates import ArrayAgg
 from django.db.models import Count, Exists, F, OuterRef, Q, Value
@@ -98,14 +99,16 @@ class BeerViewSet(BrowsableMixin, ModelViewSet):
         )
         return Response(list(styles))
 
-    @action(detail=True, methods=["post", "delete"], permission_classes=[permissions.IsAuthenticated])
+    @action(
+        detail=True,
+        methods=["post", "delete"],
+        permission_classes=[permissions.IsAuthenticated],
+    )
     def mark_tasted(self, request, pk=None):
         beer = self.get_object()
 
         if request.method == "POST":
-            tasted, created = Tasted.objects.get_or_create(
-                user=request.user, beer=beer
-            )
+            tasted, created = Tasted.objects.get_or_create(user=request.user, beer=beer)
             if created:
                 return Response({"status": "marked as tasted"}, status=201)
             return Response({"status": "already marked as tasted"}, status=200)
@@ -116,7 +119,55 @@ class BeerViewSet(BrowsableMixin, ModelViewSet):
             ).delete()
             if deleted_count > 0:
                 return Response({"status": "removed from tasted"}, status=204)
-            return Response({"status": "not marked as tasted"}, status=404)
+            return Response({"status": "not found"}, status=404)
+
+    @action(
+        detail=False,
+        methods=["post"],
+        permission_classes=[permissions.IsAuthenticated],
+    )
+    def bulk_mark_tasted(self, request) -> Response:
+        uploaded_file = request.FILES.get("file")
+        if not uploaded_file:
+            return Response({"error": "No file provided"}, status=400)
+
+        try:
+            checkins = parse_untappd_file(uploaded_file)
+        except Exception as e:
+            return Response(
+                {"error": "Failed to parse file", "details": str(e)}, status=400
+            )
+
+        if checkins is None:
+            return Response(
+                {"error": "Unsupported file format. Use .csv or .json"}, status=400
+            )
+
+        if not checkins:
+            return Response({"error": "No valid beer IDs found in file"}, status=400)
+
+        beer_ids = [beer_id for beer_id, _ in checkins]
+        beers = Beer.objects.filter(untpd_id__in=beer_ids)
+        existing = set(
+            Tasted.objects.filter(user=request.user, beer__in=beers).values_list(
+                "beer_id", flat=True
+            )
+        )
+        to_create = [
+            Tasted(user=request.user, beer=beer)
+            for beer in beers
+            if beer.pk not in existing
+        ]
+        Tasted.objects.bulk_create(to_create)
+
+        return Response(
+            {
+                "imported_count": len(to_create),
+                "total_check_ins": len(checkins),
+                "message": f"Successfully imported {len(to_create)} beers from {len(checkins)} check-ins",
+            },
+            status=200,
+        )
 
 
 class StockChangeViewSet(BrowsableMixin, ModelViewSet):
