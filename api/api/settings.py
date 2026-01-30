@@ -2,13 +2,20 @@ import json
 import os
 from pathlib import Path
 
+import firebase_admin
 import sentry_sdk
+from firebase_admin import credentials
 from sentry_sdk.integrations.django import DjangoIntegration
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "dummykey")
 DEBUG = int(os.getenv("DEBUG_VALUE", 1))
 DEFAULT_AUTO_FIELD = "django.db.models.AutoField"
+
+firebase_creds_json = os.getenv("FIREBASE_CREDENTIALS_JSON")
+if firebase_creds_json and not firebase_admin._apps:
+    cred = credentials.Certificate(json.loads(firebase_creds_json))
+    firebase_admin.initialize_app(cred)
 
 
 ALLOWED_HOSTS = os.getenv(
@@ -118,6 +125,10 @@ CORS_ALLOWED_ORIGINS = [
 ]
 CORS_ALLOW_METHODS = [
     "GET",
+    "POST",
+    "PUT",
+    "PATCH",
+    "DELETE",
 ]
 CSRF_TRUSTED_ORIGINS = [
     "https://api.olmonopolet.app",
@@ -126,6 +137,7 @@ CSRF_TRUSTED_ORIGINS = [
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
+        "api.authentication.FirebaseAuthentication",
         "rest_framework.authentication.SessionAuthentication",
         "rest_framework.authentication.TokenAuthentication",
     ),

@@ -20,6 +20,7 @@ class BeerSerializer(DynamicFieldsMixin, serializers.ModelSerializer):
         source="country.iso_code", read_only=True, allow_null=True
     )
     value_score = serializers.FloatField(read_only=True)
+    user_tasted = serializers.BooleanField(read_only=True)
 
     def get_badges(self, beer: Beer):
         badges_queryset = Badge.objects.filter(beer=beer)
@@ -103,6 +104,7 @@ class BeerSerializer(DynamicFieldsMixin, serializers.ModelSerializer):
             "allergens",
             "is_christmas_beer",
             "value_score",
+            "user_tasted",
         ]
 
 

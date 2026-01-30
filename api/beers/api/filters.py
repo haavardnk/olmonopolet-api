@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from beers.models import Beer, Stock
-from django.db.models import F, Q, QuerySet
+from beers.models import Beer, Stock, Tasted
+from django.db.models import Exists, F, OuterRef, Q, QuerySet
 from django.http import HttpRequest
 from django_filters import rest_framework as flt
 from rest_framework import filters
@@ -49,6 +49,7 @@ class BeerFilter(flt.FilterSet):
     release = flt.CharFilter(method="custom_release_filter")
     exclude_allergen = flt.CharFilter(method="custom_allergen_filter")
     is_christmas_beer = flt.BooleanFilter(field_name="is_christmas_beer")
+    user_tasted = flt.BooleanFilter(method="custom_user_tasted_filter")
 
     def _build_multi_value_query(self, values: str, field_lookup: str) -> Q:
         query = Q()
@@ -104,6 +105,21 @@ class BeerFilter(flt.FilterSet):
         query = self._build_multi_value_query(value, "main_category__iexact")
         return queryset.filter(query).distinct()
 
+    def custom_user_tasted_filter(
+        self, queryset: QuerySet[Beer], name: str, value: bool
+    ) -> QuerySet[Beer]:
+        request = self.request
+        if not request or not request.user or not request.user.is_authenticated:
+            return queryset
+
+        user_tasted_subquery = Tasted.objects.filter(
+            user=request.user, beer=OuterRef("pk")
+        )
+        if value:
+            return queryset.filter(Exists(user_tasted_subquery))
+        else:
+            return queryset.filter(~Exists(user_tasted_subquery))
+
     class Meta:
         model = Beer
         fields = [
@@ -125,6 +141,7 @@ class BeerFilter(flt.FilterSet):
             "store_delivery",
             "is_christmas_beer",
             "main_category",
+            "user_tasted",
         ]
 
 

@@ -9,6 +9,7 @@ from beers.models import (
     Release,
     Stock,
     Store,
+    Tasted,
     VmpNotReleased,
     WrongMatch,
 )
@@ -97,6 +98,13 @@ class ReleaseAdmin(admin.ModelAdmin):
 class CountryAdmin(admin.ModelAdmin):
     list_display = ("name", "iso_code")
     search_fields = ("name", "iso_code")
+
+
+@admin.register(Tasted)
+class TastedAdmin(admin.ModelAdmin):
+    list_display = ("user", "beer")
+    search_fields = ("user__username", "beer__vmp_name")
+    raw_id_fields = ("user", "beer")
 
 
 admin.site.register(Option)

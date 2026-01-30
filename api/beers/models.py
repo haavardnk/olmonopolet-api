@@ -264,3 +264,17 @@ class Release(models.Model):
     release_date = models.DateTimeField(blank=True, null=True)
     product_selection = models.CharField(max_length=150, blank=True, null=True)
     is_christmas_release = models.BooleanField(default=False)
+
+
+class Tasted(models.Model):
+    user = models.ForeignKey("auth.User", on_delete=CASCADE)
+    beer = models.ForeignKey(Beer, on_delete=CASCADE)
+
+    class Meta:
+        unique_together = ["user", "beer"]
+        indexes = [
+            models.Index(fields=["user", "beer"]),
+        ]
+
+    def __str__(self):
+        return f"{self.user.username} - {self.beer.vmp_name}"

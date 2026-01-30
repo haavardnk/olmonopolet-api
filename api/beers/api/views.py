@@ -15,9 +15,9 @@ from beers.api.serializers import (
     StoreSerializer,
     WrongMatchSerializer,
 )
-from beers.models import Beer, Country, Release, Stock, Store, WrongMatch
+from beers.models import Beer, Country, Release, Stock, Store, Tasted, WrongMatch
 from django.contrib.postgres.aggregates import ArrayAgg
-from django.db.models import Count, F, Q
+from django.db.models import Count, Exists, F, OuterRef, Q, Value
 from django.db.models.functions import Greatest
 from django.db.models.manager import BaseManager
 from django_filters.rest_framework import DjangoFilterBackend
@@ -72,6 +72,14 @@ class BeerViewSet(BrowsableMixin, ModelViewSet):
         queryset = Beer.objects.all()
         queryset = queryset.prefetch_related("badge_set", "stock_set")
 
+        if self.request.user and self.request.user.is_authenticated:
+            user_tasted_subquery = Tasted.objects.filter(
+                user=self.request.user, beer=OuterRef("pk")
+            )
+            queryset = queryset.annotate(user_tasted=Exists(user_tasted_subquery))
+        else:
+            queryset = queryset.annotate(user_tasted=Value(False))
+
         beers = getattr(self.request, "query_params", {}).get("beers")
         if beers is not None:
             beer_ids = [int(v) for v in beers.split(",")]
@@ -89,6 +97,26 @@ class BeerViewSet(BrowsableMixin, ModelViewSet):
             .order_by("style")
         )
         return Response(list(styles))
+
+    @action(detail=True, methods=["post", "delete"], permission_classes=[permissions.IsAuthenticated])
+    def mark_tasted(self, request, pk=None):
+        beer = self.get_object()
+
+        if request.method == "POST":
+            tasted, created = Tasted.objects.get_or_create(
+                user=request.user, beer=beer
+            )
+            if created:
+                return Response({"status": "marked as tasted"}, status=201)
+            return Response({"status": "already marked as tasted"}, status=200)
+
+        elif request.method == "DELETE":
+            deleted_count, _ = Tasted.objects.filter(
+                user=request.user, beer=beer
+            ).delete()
+            if deleted_count > 0:
+                return Response({"status": "removed from tasted"}, status=204)
+            return Response({"status": "not marked as tasted"}, status=404)
 
 
 class StockChangeViewSet(BrowsableMixin, ModelViewSet):
