@@ -39,6 +39,7 @@ class BeerFilter(flt.FilterSet):
     product_selection = flt.CharFilter(method="custom_product_selection_filter")
     store = flt.CharFilter(method="custom_store_filter")
     country = flt.CharFilter(method="custom_country_filter")
+    main_category = flt.CharFilter(method="custom_main_category_filter")
     price_high = flt.NumberFilter(field_name="price", lookup_expr="lte")
     price_low = flt.NumberFilter(field_name="price", lookup_expr="gte")
     ppv_high = flt.NumberFilter(field_name="price_per_volume", lookup_expr="lte")
@@ -97,6 +98,12 @@ class BeerFilter(flt.FilterSet):
         query = self._build_multi_value_query(value, "allergens__icontains")
         return queryset.exclude(query).distinct()
 
+    def custom_main_category_filter(
+        self, queryset: QuerySet[Beer], name: str, value: str
+    ) -> QuerySet[Beer]:
+        query = self._build_multi_value_query(value, "main_category__iexact")
+        return queryset.filter(query).distinct()
+
     class Meta:
         model = Beer
         fields = [
@@ -117,6 +124,7 @@ class BeerFilter(flt.FilterSet):
             "post_delivery",
             "store_delivery",
             "is_christmas_beer",
+            "main_category",
         ]
 
 
