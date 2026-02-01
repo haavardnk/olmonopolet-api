@@ -1,3 +1,5 @@
+import uuid
+
 import requests
 from dirtyfields import DirtyFieldsMixin
 from django.core.validators import MaxValueValidator, MinValueValidator, URLValidator
@@ -281,3 +283,33 @@ class Tasted(models.Model):
 
     def __str__(self):
         return f"{self.user.username} - {self.beer.vmp_name}"
+
+
+class UserList(models.Model):
+    user = models.ForeignKey("auth.User", on_delete=CASCADE, related_name="lists")
+    name = models.CharField(max_length=100)
+    description = models.TextField(blank=True, null=True)
+    sort_order = models.PositiveIntegerField(default=0)
+    share_token = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["sort_order", "created_at"]
+
+    def __str__(self):
+        return f"{self.user.username} - {self.name}"
+
+
+class UserListItem(models.Model):
+    list = models.ForeignKey(UserList, on_delete=CASCADE, related_name="items")
+    product_id = models.CharField(max_length=50)
+    position = models.PositiveIntegerField(default=0)
+    added_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ["list", "product_id"]
+        ordering = ["position", "added_at"]
+
+    def __str__(self):
+        return f"{self.list.name} - {self.product_id}"

@@ -1,5 +1,11 @@
 from __future__ import annotations
 
+from django.contrib import admin
+from django.contrib.auth.admin import UserAdmin
+from django.contrib.auth.models import User
+from django.db.models import Count, QuerySet
+from django.http import HttpRequest
+
 from beers.models import (
     Badge,
     Beer,
@@ -10,14 +16,11 @@ from beers.models import (
     Stock,
     Store,
     Tasted,
+    UserList,
+    UserListItem,
     VmpNotReleased,
     WrongMatch,
 )
-from django.contrib import admin
-from django.contrib.auth.admin import UserAdmin
-from django.contrib.auth.models import User
-from django.db.models import Count, QuerySet
-from django.http import HttpRequest
 
 
 class MatchManually(Beer):
@@ -30,6 +33,13 @@ class UserWithTasted(User):
         proxy = True
         verbose_name = "User Tasted"
         verbose_name_plural = "User Tasteds"
+
+
+class UserWithLists(User):
+    class Meta:
+        proxy = True
+        verbose_name = "User List"
+        verbose_name_plural = "User Lists"
 
 
 class TastedInline(admin.TabularInline):
@@ -127,6 +137,96 @@ class UserWithTastedAdmin(admin.ModelAdmin):
     @admin.display(ordering="tasted_count")
     def tasted_count(self, obj):
         return obj.tasted_count
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+class UserListItemInline(admin.TabularInline):
+    model = UserListItem
+    extra = 0
+    fields = ("product_id", "beer_name", "position", "added_at")
+    readonly_fields = ("beer_name", "added_at")
+    ordering = ("position",)
+
+    def beer_name(self, obj):
+        try:
+            beer = Beer.objects.get(vmp_id=obj.product_id)
+            return beer.vmp_name
+        except Beer.DoesNotExist:
+            return f"Unknown ({obj.product_id})"
+
+    beer_name.short_description = "Beer"
+
+
+class UserListInline(admin.TabularInline):
+    model = UserList
+    extra = 0
+    fields = ("name", "item_count", "sort_order", "share_token")
+    readonly_fields = ("share_token", "item_count")
+    show_change_link = True
+
+    def item_count(self, obj):
+        return obj.items.count()
+
+    item_count.short_description = "Items"
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+
+class UserListAdmin(admin.ModelAdmin):
+    list_display = ("name", "user", "item_count", "sort_order", "created_at")
+    list_filter = ("user",)
+    search_fields = ("name", "user__username")
+    fields = (
+        "user",
+        "name",
+        "description",
+        "sort_order",
+        "share_token",
+        "created_at",
+        "updated_at",
+    )
+    readonly_fields = ("user", "share_token", "created_at", "updated_at")
+    inlines = [UserListItemInline]
+
+    def item_count(self, obj):
+        return obj.items.count()
+
+    item_count.short_description = "Items"
+
+    def has_module_permission(self, request):
+        return False
+
+    def has_view_permission(self, request, obj=None):
+        return True
+
+    def has_change_permission(self, request, obj=None):
+        return True
+
+
+admin.site.register(UserList, UserListAdmin)
+
+
+@admin.register(UserWithLists)
+class UserWithListsAdmin(admin.ModelAdmin):
+    list_display = ("username", "email", "list_count")
+    search_fields = ("username", "email")
+    fields = ("username", "email")
+    readonly_fields = ("username", "email")
+    inlines = [UserListInline]
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        return qs.annotate(list_count=Count("lists")).filter(list_count__gt=0)
+
+    @admin.display(ordering="list_count")
+    def list_count(self, obj):
+        return obj.list_count
 
     def has_add_permission(self, request):
         return False

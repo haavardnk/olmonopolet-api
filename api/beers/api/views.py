@@ -9,16 +9,31 @@ from beers.api.pagination import LargeResultPagination, Pagination
 from beers.api.serializers import (
     BeerSerializer,
     CountrySerializer,
+    ListReorderSerializer,
+    ProductReorderSerializer,
     ReleaseSerializer,
+    SharedUserListSerializer,
     StockChangeSerializer,
     StockSerializer,
     StoreSerializer,
+    UserListCreateSerializer,
+    UserListSerializer,
     WrongMatchSerializer,
 )
 from beers.api.utils import parse_untappd_file
-from beers.models import Beer, Country, Release, Stock, Store, Tasted, WrongMatch
+from beers.models import (
+    Beer,
+    Country,
+    Release,
+    Stock,
+    Store,
+    Tasted,
+    UserList,
+    UserListItem,
+    WrongMatch,
+)
 from django.contrib.postgres.aggregates import ArrayAgg
-from django.db.models import Count, Exists, F, OuterRef, Q, Value
+from django.db.models import Count, Exists, F, Max, OuterRef, Q, Value
 from django.db.models.functions import Greatest
 from django.db.models.manager import BaseManager
 from django_filters.rest_framework import DjangoFilterBackend
@@ -291,4 +306,92 @@ class CountryViewSet(BrowsableMixin, ModelViewSet):
     def unmapped(self, request):
         countries = Country.objects.filter(iso_code__isnull=True).order_by("name")
         serializer = self.get_serializer(countries, many=True)
+        return Response(serializer.data)
+
+
+class UserListViewSet(BrowsableMixin, ModelViewSet):
+    serializer_class = UserListSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return UserList.objects.filter(user=self.request.user)
+
+    def get_serializer_class(self):
+        if self.action == "create":
+            return UserListCreateSerializer
+        return UserListSerializer
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+    @action(detail=False, methods=["patch"], url_path="reorder")
+    def reorder_lists(self, request):
+        serializer = ListReorderSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        for item in serializer.validated_data["order"]:
+            UserList.objects.filter(id=item["id"], user=request.user).update(
+                sort_order=item["sort_order"]
+            )
+
+        return Response({"status": "ok"})
+
+    @action(
+        detail=True,
+        methods=["post", "delete"],
+        url_path=r"products/(?P<product_id>\d+)",
+    )
+    def product(self, request, pk=None, product_id=None):
+        user_list = self.get_object()
+
+        if request.method == "POST":
+            if not Beer.objects.filter(vmp_id=product_id).exists():
+                return Response({"error": "Product not found"}, status=404)
+
+            max_position = (
+                user_list.items.aggregate(max_pos=Max("position"))["max_pos"] or 0
+            )
+            item, created = UserListItem.objects.get_or_create(
+                list=user_list,
+                product_id=product_id,
+                defaults={"position": max_position + 1},
+            )
+            if not created:
+                return Response({"error": "Product already in list"}, status=400)
+            return Response({"status": "added", "product_id": product_id}, status=201)
+
+        if request.method == "DELETE":
+            deleted, _ = UserListItem.objects.filter(
+                list=user_list, product_id=product_id
+            ).delete()
+            if not deleted:
+                return Response({"error": "Product not in list"}, status=404)
+            return Response(status=204)
+
+    @action(detail=True, methods=["patch"], url_path="products/reorder")
+    def reorder_products(self, request, pk=None):
+        user_list = self.get_object()
+        serializer = ProductReorderSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        for item in serializer.validated_data["order"]:
+            UserListItem.objects.filter(
+                list=user_list, product_id=item["product_id"]
+            ).update(position=item["position"])
+
+        return Response({"status": "ok"})
+
+    @action(
+        detail=False,
+        methods=["get"],
+        url_path=r"shared/(?P<share_token>[^/.]+)",
+        permission_classes=[permissions.AllowAny],
+    )
+    def shared(self, request, share_token=None):
+        try:
+            user_list = UserList.objects.get(share_token=share_token)
+        except UserList.DoesNotExist:
+            return Response({"error": "List not found"}, status=404)
+
+        serializer = SharedUserListSerializer(user_list)
         return Response(serializer.data)

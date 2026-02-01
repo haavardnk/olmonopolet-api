@@ -1,6 +1,15 @@
 from __future__ import annotations
 
-from beers.models import Badge, Beer, Country, Release, Stock, Store, WrongMatch
+from beers.models import (
+    Badge,
+    Beer,
+    Country,
+    Release,
+    Stock,
+    Store,
+    UserList,
+    WrongMatch,
+)
 from django.contrib.auth.models import User
 from drf_dynamic_fields import DynamicFieldsMixin
 from rest_framework import serializers
@@ -248,3 +257,78 @@ class CountrySerializer(serializers.ModelSerializer):
     class Meta:
         model = Country
         fields = ["name", "iso_code"]
+
+
+class UserListSerializer(serializers.ModelSerializer):
+    product_ids = serializers.SerializerMethodField()
+
+    class Meta:
+        model = UserList
+        fields = [
+            "id",
+            "name",
+            "description",
+            "product_ids",
+            "sort_order",
+            "share_token",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = [
+            "id",
+            "product_ids",
+            "share_token",
+            "created_at",
+            "updated_at",
+        ]
+
+    def get_product_ids(self, obj):
+        return list(obj.items.values_list("product_id", flat=True))
+
+
+class UserListCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UserList
+        fields = [
+            "id",
+            "name",
+            "description",
+            "sort_order",
+            "share_token",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = [
+            "id",
+            "sort_order",
+            "share_token",
+            "created_at",
+            "updated_at",
+        ]
+
+
+class SharedUserListSerializer(serializers.ModelSerializer):
+    product_ids = serializers.SerializerMethodField()
+    user_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = UserList
+        fields = ["name", "description", "product_ids", "user_name"]
+
+    def get_product_ids(self, obj):
+        return list(obj.items.values_list("product_id", flat=True))
+
+    def get_user_name(self, obj):
+        if obj.user.first_name or obj.user.last_name:
+            return f"{obj.user.first_name} {obj.user.last_name}".strip()
+        return obj.user.username
+
+
+class ListReorderSerializer(serializers.Serializer):
+    order = serializers.ListField(
+        child=serializers.DictField(child=serializers.IntegerField())
+    )
+
+
+class ProductReorderSerializer(serializers.Serializer):
+    order = serializers.ListField(child=serializers.DictField())

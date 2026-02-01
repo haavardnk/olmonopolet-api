@@ -5,6 +5,7 @@ from beers.api.views import (
     StockChangeViewSet,
     StockViewSet,
     StoreViewSet,
+    UserListViewSet,
     WrongMatchViewSet,
 )
 from django.conf import settings
@@ -20,6 +21,7 @@ router.register("stock", StockViewSet, basename="stock")
 router.register("stockchange", StockChangeViewSet, basename="stockchange")
 router.register("release", ReleaseViewSet, basename="release")
 router.register("wrongmatch", WrongMatchViewSet, basename="wrongmatch")
+router.register("lists", UserListViewSet, basename="userlist")
 
 urlpatterns = [
     path("", include(router.urls)),
