@@ -20,7 +20,7 @@ from beers.api.serializers import (
     UserListSerializer,
     WrongMatchSerializer,
 )
-from beers.api.utils import parse_untappd_file
+from beers.api.utils import bulk_import_tasted, parse_untappd_file
 from beers.models import (
     Beer,
     Country,
@@ -161,25 +161,12 @@ class BeerViewSet(BrowsableMixin, ModelViewSet):
         if not checkins:
             return Response({"error": "No valid beer IDs found in file"}, status=400)
 
-        beer_ids = [beer_id for beer_id, _ in checkins]
-        beers = Beer.objects.filter(untpd_id__in=beer_ids)
-        existing = set(
-            Tasted.objects.filter(user=request.user, beer__in=beers).values_list(
-                "beer_id", flat=True
-            )
-        )
-        to_create = [
-            Tasted(user=request.user, beer=beer)
-            for beer in beers
-            if beer.pk not in existing
-        ]
-        Tasted.objects.bulk_create(to_create)
+        result = bulk_import_tasted(request.user, checkins)
 
         return Response(
             {
-                "imported_count": len(to_create),
-                "total_check_ins": len(checkins),
-                "message": f"Successfully imported {len(to_create)} beers from {len(checkins)} check-ins",
+                **result,
+                "message": f"Successfully imported {result['imported_count']} beers from {result['total_check_ins']} check-ins",
             },
             status=200,
         )
