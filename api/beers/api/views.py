@@ -9,15 +9,19 @@ from beers.api.pagination import LargeResultPagination, Pagination
 from beers.api.serializers import (
     BeerSerializer,
     CountrySerializer,
+    ItemReorderSerializer,
     ListReorderSerializer,
-    ProductReorderSerializer,
     ReleaseSerializer,
     SharedUserListSerializer,
     StockChangeSerializer,
     StockSerializer,
     StoreSerializer,
     UserListCreateSerializer,
+    UserListItemCreateSerializer,
+    UserListItemSerializer,
+    UserListItemUpdateSerializer,
     UserListSerializer,
+    UserListUpdateSerializer,
     WrongMatchSerializer,
 )
 from beers.api.utils import bulk_import_tasted, parse_untappd_file
@@ -37,7 +41,7 @@ from django.db.models import Count, Exists, F, Max, OuterRef, Q, Value
 from django.db.models.functions import Greatest
 from django.db.models.manager import BaseManager
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import filters, permissions
+from rest_framework import filters, permissions, status
 from rest_framework.decorators import action
 from rest_framework.renderers import BrowsableAPIRenderer
 from rest_framework.response import Response
@@ -301,72 +305,140 @@ class UserListViewSet(BrowsableMixin, ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        return UserList.objects.filter(user=self.request.user)
+        return UserList.objects.filter(user=self.request.user).prefetch_related("items")
 
     def get_serializer_class(self):
         if self.action == "create":
             return UserListCreateSerializer
+        if self.action in ("update", "partial_update"):
+            return UserListUpdateSerializer
         return UserListSerializer
 
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        if self.action == "retrieve":
+            context["include_items"] = True
+        return context
+
     def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
+        max_sort = (
+            UserList.objects.filter(user=self.request.user).aggregate(
+                max_sort=Max("sort_order")
+            )["max_sort"]
+            or 0
+        )
+        serializer.save(user=self.request.user, sort_order=max_sort + 1)
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        response_serializer = UserListSerializer(
+            serializer.instance, context={"include_items": True}
+        )
+        return Response(response_serializer.data, status=status.HTTP_201_CREATED)
+
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop("partial", False)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        response_serializer = UserListSerializer(
+            instance, context={"include_items": True}
+        )
+        return Response(response_serializer.data)
 
     @action(detail=False, methods=["patch"], url_path="reorder")
     def reorder_lists(self, request):
         serializer = ListReorderSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        for item in serializer.validated_data["order"]:
-            UserList.objects.filter(id=item["id"], user=request.user).update(
-                sort_order=item["sort_order"]
+        list_ids = serializer.validated_data["list_ids"]
+        for index, list_id in enumerate(list_ids):
+            UserList.objects.filter(id=list_id, user=request.user).update(
+                sort_order=index
             )
 
-        return Response({"status": "ok"})
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(detail=True, methods=["post"], url_path="items")
+    def add_item(self, request, pk=None):
+        user_list = self.get_object()
+        serializer = UserListItemCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        product_id = serializer.validated_data["product_id"]
+
+        if not Beer.objects.filter(vmp_id=product_id).exists():
+            return Response(
+                {"error": "Product not found"}, status=status.HTTP_404_NOT_FOUND
+            )
+
+        if UserListItem.objects.filter(list=user_list, product_id=product_id).exists():
+            return Response(
+                {"error": "Product already in list"}, status=status.HTTP_409_CONFLICT
+            )
+
+        max_sort = (
+            user_list.items.aggregate(max_sort=Max("sort_order"))["max_sort"] or 0
+        )
+
+        item = UserListItem.objects.create(
+            list=user_list,
+            product_id=product_id,
+            quantity=serializer.validated_data.get("quantity", 1),
+            year=serializer.validated_data.get("year"),
+            notes=serializer.validated_data.get("notes"),
+            sort_order=max_sort + 1,
+        )
+
+        response_serializer = UserListItemSerializer(
+            item, context={"selected_store_id": user_list.selected_store_id}
+        )
+        return Response(response_serializer.data, status=status.HTTP_201_CREATED)
 
     @action(
         detail=True,
-        methods=["post", "delete"],
-        url_path=r"products/(?P<product_id>\d+)",
+        methods=["patch", "delete"],
+        url_path=r"items/(?P<item_id>\d+)",
     )
-    def product(self, request, pk=None, product_id=None):
+    def item_detail(self, request, pk=None, item_id=None):
         user_list = self.get_object()
 
-        if request.method == "POST":
-            if not Beer.objects.filter(vmp_id=product_id).exists():
-                return Response({"error": "Product not found"}, status=404)
-
-            max_position = (
-                user_list.items.aggregate(max_pos=Max("position"))["max_pos"] or 0
+        try:
+            item = user_list.items.get(id=item_id)
+        except UserListItem.DoesNotExist:
+            return Response(
+                {"error": "Item not found"}, status=status.HTTP_404_NOT_FOUND
             )
-            item, created = UserListItem.objects.get_or_create(
-                list=user_list,
-                product_id=product_id,
-                defaults={"position": max_position + 1},
-            )
-            if not created:
-                return Response({"error": "Product already in list"}, status=400)
-            return Response({"status": "added", "product_id": product_id}, status=201)
 
         if request.method == "DELETE":
-            deleted, _ = UserListItem.objects.filter(
-                list=user_list, product_id=product_id
-            ).delete()
-            if not deleted:
-                return Response({"error": "Product not in list"}, status=404)
-            return Response(status=204)
+            item.delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)
 
-    @action(detail=True, methods=["patch"], url_path="products/reorder")
-    def reorder_products(self, request, pk=None):
+        serializer = UserListItemUpdateSerializer(item, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        response_serializer = UserListItemSerializer(
+            item, context={"selected_store_id": user_list.selected_store_id}
+        )
+        return Response(response_serializer.data)
+
+    @action(detail=True, methods=["patch"], url_path="items/reorder")
+    def reorder_items(self, request, pk=None):
         user_list = self.get_object()
-        serializer = ProductReorderSerializer(data=request.data)
+        serializer = ItemReorderSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        for item in serializer.validated_data["order"]:
-            UserListItem.objects.filter(
-                list=user_list, product_id=item["product_id"]
-            ).update(position=item["position"])
+        item_ids = serializer.validated_data["item_ids"]
+        for index, item_id in enumerate(item_ids):
+            UserListItem.objects.filter(list=user_list, id=item_id).update(
+                sort_order=index
+            )
 
-        return Response({"status": "ok"})
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(
         detail=False,
@@ -378,7 +450,9 @@ class UserListViewSet(BrowsableMixin, ModelViewSet):
         try:
             user_list = UserList.objects.get(share_token=share_token)
         except UserList.DoesNotExist:
-            return Response({"error": "List not found"}, status=404)
+            return Response(
+                {"error": "List not found"}, status=status.HTTP_404_NOT_FOUND
+            )
 
         serializer = SharedUserListSerializer(user_list)
         return Response(serializer.data)

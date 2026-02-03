@@ -8,9 +8,11 @@ from beers.models import (
     Stock,
     Store,
     UserList,
+    UserListItem,
     WrongMatch,
 )
 from django.contrib.auth.models import User
+from django.db import models
 from drf_dynamic_fields import DynamicFieldsMixin
 from rest_framework import serializers
 
@@ -37,7 +39,9 @@ class BeerSerializer(DynamicFieldsMixin, serializers.ModelSerializer):
         return serializer.data
 
     def get_stock(self, beer: Beer) -> int | None:
-        store = self.context["request"].query_params.get("store")
+        store = self.context["request"].query_params.get("store") or self.context[
+            "request"
+        ].query_params.get("check_store")
         if store is not None and len(store.split(",")) < 2:
             try:
                 stock = Stock.objects.get(beer=beer, store=store)
@@ -259,8 +263,50 @@ class CountrySerializer(serializers.ModelSerializer):
         fields = ["name", "iso_code"]
 
 
+class UserListItemSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UserListItem
+        fields = [
+            "id",
+            "product_id",
+            "quantity",
+            "year",
+            "notes",
+            "sort_order",
+            "created_at",
+        ]
+        read_only_fields = ["id", "sort_order", "created_at"]
+
+
+class UserListItemCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UserListItem
+        fields = ["product_id", "quantity", "year", "notes"]
+
+    def validate_quantity(self, value):
+        if value < 1:
+            raise serializers.ValidationError("Quantity must be at least 1")
+        return value
+
+
+class UserListItemUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UserListItem
+        fields = ["quantity", "year", "notes"]
+
+    def validate_quantity(self, value):
+        if value is not None and value < 1:
+            raise serializers.ValidationError("Quantity must be at least 1")
+        return value
+
+
 class UserListSerializer(serializers.ModelSerializer):
+    item_count = serializers.SerializerMethodField()
     product_ids = serializers.SerializerMethodField()
+    is_past = serializers.SerializerMethodField()
+    stats = serializers.SerializerMethodField()
+    items = serializers.SerializerMethodField()
+    total_price = serializers.SerializerMethodField()
 
     class Meta:
         model = UserList
@@ -268,22 +314,111 @@ class UserListSerializer(serializers.ModelSerializer):
             "id",
             "name",
             "description",
-            "product_ids",
-            "sort_order",
+            "list_type",
+            "selected_store_id",
+            "event_date",
             "share_token",
+            "sort_order",
             "created_at",
             "updated_at",
+            "item_count",
+            "product_ids",
+            "is_past",
+            "stats",
+            "items",
+            "total_price",
         ]
         read_only_fields = [
             "id",
-            "product_ids",
             "share_token",
             "created_at",
             "updated_at",
+            "item_count",
+            "product_ids",
+            "is_past",
+            "stats",
+            "items",
+            "total_price",
         ]
+
+    def get_item_count(self, obj):
+        return obj.items.aggregate(total=models.Sum("quantity"))["total"] or 0
 
     def get_product_ids(self, obj):
         return list(obj.items.values_list("product_id", flat=True))
+
+    def get_is_past(self, obj):
+        if obj.list_type != UserList.ListType.EVENT or not obj.event_date:
+            return None
+        from datetime import date
+
+        return obj.event_date < date.today()
+
+    def get_stats(self, obj):
+        if obj.list_type != UserList.ListType.CELLAR:
+            return None
+
+        items = obj.items.all()
+        if not items.exists():
+            return {
+                "total_bottles": 0,
+                "total_value": 0,
+                "oldest_year": None,
+                "newest_year": None,
+            }
+
+        total_bottles = items.aggregate(total=models.Sum("quantity"))["total"] or 0
+        years = items.exclude(year__isnull=True).values_list("year", flat=True)
+
+        total_value = 0
+        for item in items:
+            try:
+                beer = Beer.objects.get(vmp_id=item.product_id)
+                if beer.price:
+                    total_value += item.quantity * beer.price
+            except Beer.DoesNotExist:
+                pass
+
+        return {
+            "total_bottles": total_bottles,
+            "total_value": round(total_value, 2),
+            "oldest_year": min(years) if years else None,
+            "newest_year": max(years) if years else None,
+        }
+
+    def get_items(self, obj):
+        if not self.context.get("include_items", False):
+            return None
+        items = obj.items.all()
+        return UserListItemSerializer(
+            items, many=True, context={"selected_store_id": obj.selected_store_id}
+        ).data
+
+    def get_total_price(self, obj):
+        if obj.list_type != UserList.ListType.SHOPPING:
+            return None
+
+        total = 0
+        for item in obj.items.all():
+            try:
+                beer = Beer.objects.get(vmp_id=item.product_id)
+                if beer.price:
+                    total += item.quantity * beer.price
+            except Beer.DoesNotExist:
+                pass
+        return round(total, 2)
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        if data.get("is_past") is None:
+            data.pop("is_past", None)
+        if data.get("stats") is None:
+            data.pop("stats", None)
+        if data.get("items") is None:
+            data.pop("items", None)
+        if data.get("total_price") is None:
+            data.pop("total_price", None)
+        return data
 
 
 class UserListCreateSerializer(serializers.ModelSerializer):
@@ -293,6 +428,8 @@ class UserListCreateSerializer(serializers.ModelSerializer):
             "id",
             "name",
             "description",
+            "list_type",
+            "event_date",
             "sort_order",
             "share_token",
             "created_at",
@@ -306,29 +443,133 @@ class UserListCreateSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
 
+    def validate(self, data):
+        if data.get("list_type") == UserList.ListType.EVENT and not data.get(
+            "event_date"
+        ):
+            pass
+        return data
+
+
+class UserListUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UserList
+        fields = ["name", "description", "selected_store_id", "event_date", "list_type"]
+
 
 class SharedUserListSerializer(serializers.ModelSerializer):
-    product_ids = serializers.SerializerMethodField()
+    items = serializers.SerializerMethodField()
     user_name = serializers.SerializerMethodField()
+    store_name = serializers.SerializerMethodField()
+    is_past = serializers.SerializerMethodField()
+    stats = serializers.SerializerMethodField()
+    total_price = serializers.SerializerMethodField()
 
     class Meta:
         model = UserList
-        fields = ["name", "description", "product_ids", "user_name"]
+        fields = [
+            "id",
+            "name",
+            "description",
+            "list_type",
+            "selected_store_id",
+            "store_name",
+            "event_date",
+            "share_token",
+            "sort_order",
+            "created_at",
+            "updated_at",
+            "user_name",
+            "is_past",
+            "stats",
+            "items",
+            "total_price",
+        ]
 
-    def get_product_ids(self, obj):
-        return list(obj.items.values_list("product_id", flat=True))
+    def get_items(self, obj):
+        items = obj.items.all()
+        return UserListItemSerializer(
+            items, many=True, context={"selected_store_id": obj.selected_store_id}
+        ).data
 
     def get_user_name(self, obj):
         if obj.user.first_name or obj.user.last_name:
             return f"{obj.user.first_name} {obj.user.last_name}".strip()
         return obj.user.username
 
+    def get_store_name(self, obj):
+        if obj.selected_store_id:
+            store = Store.objects.filter(store_id=obj.selected_store_id).first()
+            return store.name if store else None
+        return None
+
+    def get_is_past(self, obj):
+        if obj.list_type != UserList.ListType.EVENT or not obj.event_date:
+            return None
+        from datetime import date
+
+        return obj.event_date < date.today()
+
+    def get_stats(self, obj):
+        if obj.list_type != UserList.ListType.CELLAR:
+            return None
+
+        items = obj.items.all()
+        if not items.exists():
+            return {
+                "total_bottles": 0,
+                "total_value": 0,
+                "oldest_year": None,
+                "newest_year": None,
+            }
+
+        total_bottles = items.aggregate(total=models.Sum("quantity"))["total"] or 0
+        years = items.exclude(year__isnull=True).values_list("year", flat=True)
+
+        total_value = 0
+        for item in items:
+            try:
+                beer = Beer.objects.get(vmp_id=item.product_id)
+                if beer.price:
+                    total_value += item.quantity * beer.price
+            except Beer.DoesNotExist:
+                pass
+
+        return {
+            "total_bottles": total_bottles,
+            "total_value": round(total_value, 2),
+            "oldest_year": min(years) if years else None,
+            "newest_year": max(years) if years else None,
+        }
+
+    def get_total_price(self, obj):
+        if obj.list_type != UserList.ListType.SHOPPING:
+            return None
+
+        total = 0
+        for item in obj.items.all():
+            try:
+                beer = Beer.objects.get(vmp_id=item.product_id)
+                if beer.price:
+                    total += item.quantity * beer.price
+            except Beer.DoesNotExist:
+                pass
+        return round(total, 2)
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        if data.get("is_past") is None:
+            data.pop("is_past", None)
+        if data.get("stats") is None:
+            data.pop("stats", None)
+        if data.get("total_price") is None:
+            data.pop("total_price", None)
+        return data
+
 
 class ListReorderSerializer(serializers.Serializer):
-    order = serializers.ListField(
-        child=serializers.DictField(child=serializers.IntegerField())
-    )
+    list_ids = serializers.ListField(child=serializers.IntegerField())
 
 
-class ProductReorderSerializer(serializers.Serializer):
-    order = serializers.ListField(child=serializers.DictField())
+class ItemReorderSerializer(serializers.Serializer):
+    item_ids = serializers.ListField(child=serializers.IntegerField())

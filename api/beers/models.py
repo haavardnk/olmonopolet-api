@@ -286,9 +286,20 @@ class Tasted(models.Model):
 
 
 class UserList(models.Model):
+    class ListType(models.TextChoices):
+        STANDARD = "standard", "Standard"
+        SHOPPING = "shopping", "Shopping"
+        CELLAR = "cellar", "Cellar"
+        EVENT = "event", "Event"
+
     user = models.ForeignKey("auth.User", on_delete=CASCADE, related_name="lists")
     name = models.CharField(max_length=100)
     description = models.TextField(blank=True, null=True)
+    list_type = models.CharField(
+        max_length=20, choices=ListType.choices, default=ListType.STANDARD
+    )
+    selected_store_id = models.IntegerField(blank=True, null=True)
+    event_date = models.DateField(blank=True, null=True)
     sort_order = models.PositiveIntegerField(default=0)
     share_token = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -304,12 +315,15 @@ class UserList(models.Model):
 class UserListItem(models.Model):
     list = models.ForeignKey(UserList, on_delete=CASCADE, related_name="items")
     product_id = models.CharField(max_length=50)
-    position = models.PositiveIntegerField(default=0)
-    added_at = models.DateTimeField(auto_now_add=True)
+    quantity = models.PositiveIntegerField(default=1)
+    year = models.IntegerField(blank=True, null=True)
+    notes = models.CharField(max_length=500, blank=True, null=True)
+    sort_order = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         unique_together = ["list", "product_id"]
-        ordering = ["position", "added_at"]
+        ordering = ["sort_order", "created_at"]
 
     def __str__(self):
         return f"{self.list.name} - {self.product_id}"

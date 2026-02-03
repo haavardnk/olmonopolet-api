@@ -1,11 +1,5 @@
 from __future__ import annotations
 
-from django.contrib import admin
-from django.contrib.auth.admin import UserAdmin
-from django.contrib.auth.models import User
-from django.db.models import Count, QuerySet
-from django.http import HttpRequest
-
 from beers.models import (
     Badge,
     Beer,
@@ -21,6 +15,11 @@ from beers.models import (
     VmpNotReleased,
     WrongMatch,
 )
+from django.contrib import admin
+from django.contrib.auth.admin import UserAdmin
+from django.contrib.auth.models import User
+from django.db.models import Count, QuerySet
+from django.http import HttpRequest
 
 
 class MatchManually(Beer):
@@ -148,9 +147,9 @@ class UserWithTastedAdmin(admin.ModelAdmin):
 class UserListItemInline(admin.TabularInline):
     model = UserListItem
     extra = 0
-    fields = ("product_id", "beer_name", "position", "added_at")
-    readonly_fields = ("beer_name", "added_at")
-    ordering = ("position",)
+    fields = ("product_id", "beer_name", "quantity", "sort_order", "created_at")
+    readonly_fields = ("beer_name", "created_at")
+    ordering = ("sort_order",)
 
     def beer_name(self, obj):
         try:
@@ -179,13 +178,23 @@ class UserListInline(admin.TabularInline):
 
 
 class UserListAdmin(admin.ModelAdmin):
-    list_display = ("name", "user", "item_count", "sort_order", "created_at")
-    list_filter = ("user",)
+    list_display = (
+        "name",
+        "user",
+        "list_type",
+        "item_count",
+        "sort_order",
+        "created_at",
+    )
+    list_filter = ("user", "list_type")
     search_fields = ("name", "user__username")
     fields = (
         "user",
         "name",
         "description",
+        "list_type",
+        "selected_store_id",
+        "event_date",
         "sort_order",
         "share_token",
         "created_at",
