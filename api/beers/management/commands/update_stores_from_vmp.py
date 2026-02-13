@@ -3,7 +3,6 @@ from __future__ import annotations
 from typing import Any
 
 import cloudscraper25
-import xmltodict
 from beers.models import ExternalAPI, Store
 from cloudscraper25 import CloudScraper
 from django.core.management.base import BaseCommand
@@ -75,12 +74,17 @@ class Command(BaseCommand):
     def _fetch_stores_list(
         self, baseurl: str, scraper: CloudScraper
     ) -> list[dict[str, Any]] | None:
-        url = f"{baseurl}products/search/?currentPage=0&fields=FULL&pageSize=1&query="
+        url = f"{baseurl}products/search?currentPage=0&fields=FULL&pageSize=1&q="
 
         try:
-            response_text = scraper.get(url).text
-            response = xmltodict.parse(response_text)
-            return response["productCategorySearchPage"]["facets"][0]["values"]
+            response = scraper.get(url, headers={"Accept": "application/json"}).json()
+            for facet in response.get("facets", []):
+                if facet.get("code") == "availableInStores":
+                    return facet.get("values", [])
+            self.stdout.write(
+                self.style.ERROR("No 'availableInStores' facet found in response")
+            )
+            return None
         except Exception as e:
             self.stdout.write(self.style.ERROR(f"Error fetching stores list: {e}"))
             return None
@@ -91,9 +95,9 @@ class Command(BaseCommand):
         detail_url = f"{baseurl}stores/{store_code}"
 
         try:
-            detail_response_text = scraper.get(detail_url).text
-            detail_response = xmltodict.parse(detail_response_text)
-            return detail_response["pointOfService"]
+            return scraper.get(
+                detail_url, headers={"Accept": "application/json"}
+            ).json()
         except Exception as e:
             self.stdout.write(
                 self.style.ERROR(f"Error fetching store details for {store_code}: {e}")

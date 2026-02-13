@@ -4,7 +4,6 @@ import re
 from argparse import ArgumentParser
 
 import cloudscraper25
-import xmltodict
 from beers.models import Beer, ExternalAPI, Stock, Store
 from django.core.management.base import BaseCommand
 from django.utils import timezone
@@ -23,7 +22,7 @@ class Command(BaseCommand):
             )
             return
 
-        url = f"{baseurl}products/search/"
+        url = f"{baseurl}products/search"
         stores_limit = options["stores"]
 
         stores = Store.objects.all().order_by("store_stock_updated")[:stores_limit]
@@ -134,30 +133,32 @@ class Command(BaseCommand):
     ) -> tuple[dict, int]:
         if "alkoholfritt" in product:
             query = (
-                f":name-asc:visibleInSearch:true:mainCategory:alkoholfritt:"
-                f"mainSubCategory:{product}:availableInStores:{store_id}:"
+                f":name-asc:mainCategory:alkoholfritt:"
+                f"mainSubCategory:{product}:availableInStores:{store_id}"
             )
         else:
-            query = (
-                f":name-asc:visibleInSearch:true:mainCategory:{product}:"
-                f"availableInStores:{store_id}:"
-            )
+            query = f":name-asc:mainCategory:{product}:availableInStores:{store_id}"
 
-        req_url = f"{url}?currentPage={page}&fields=FULL&pageSize=100&query={query}"
+        req_url = f"{url}?currentPage={page}&fields=FULL&pageSize=100&q={query}"
 
         scraper = cloudscraper25.create_scraper(interpreter="nodejs")
-        response_text = scraper.get(req_url).text
-        response_data = xmltodict.parse(response_text)["productCategorySearchPage"]
+        response_data = scraper.get(
+            req_url, headers={"Accept": "application/json"}
+        ).json()
         total_pages = int(response_data["pagination"]["totalPages"])
 
         return response_data, total_pages
 
     def _extract_quantity(self, product_data: dict) -> int:
-        availability_text = product_data["productAvailability"]["storesAvailability"][
-            "infos"
-        ]["availability"]
-        quantities = re.findall(r"\b\d+\b", availability_text)
-        return int(quantities[0]) if quantities else 0
+        infos = product_data["productAvailability"]["storesAvailability"].get(
+            "infos", []
+        )
+        for info in infos:
+            availability_text = info.get("availability", "")
+            quantities = re.findall(r"\b\d+\b", availability_text)
+            if quantities:
+                return int(quantities[0])
+        return 0
 
     def _update_beer_stock(
         self, store: Store, beer: Beer, quantity: int

@@ -1,8 +1,7 @@
 from __future__ import annotations
 
 import cloudscraper25
-import xmltodict
-from beers.api.utils import get_or_create_country, parse_bool
+from beers.api.utils import get_or_create_country
 from beers.models import Beer, ExternalAPI
 from django.core.management.base import BaseCommand
 from django.utils import timezone
@@ -18,7 +17,7 @@ class Command(BaseCommand):
             )
             return
 
-        url = f"{baseurl}products/search/"
+        url = f"{baseurl}products/search"
         updated = 0
         created = 0
 
@@ -78,15 +77,14 @@ class Command(BaseCommand):
 
     def _call_api(self, url: str, page: int, product: str) -> tuple[dict, int]:
         if "alkoholfritt" in product:
-            query = f":relevance:visibleInSearch:true:mainCategory:alkoholfritt:mainSubCategory:{product}:"
+            query = f":relevance:mainCategory:alkoholfritt:mainSubCategory:{product}"
         else:
-            query = f":relevance:visibleInSearch:true:mainCategory:{product}:"
+            query = f":relevance:mainCategory:{product}"
 
-        req_url = f"{url}?currentPage={page}&fields=FULL&pageSize=100&query={query}"
+        req_url = f"{url}?currentPage={page}&fields=FULL&pageSize=100&q={query}"
 
         scraper = cloudscraper25.create_scraper(interpreter="nodejs")
-        response_text = scraper.get(req_url).text
-        response = xmltodict.parse(response_text)["productCategorySearchPage"]
+        response = scraper.get(req_url, headers={"Accept": "application/json"}).json()
         total_pages = int(response["pagination"]["totalPages"])
 
         return response, total_pages
@@ -106,16 +104,14 @@ class Command(BaseCommand):
         )
         beer.product_selection = beer_data["product_selection"]
         beer.vmp_url = f"https://www.vinmonopolet.no{beer_data['url']}"
-        beer.post_delivery = parse_bool(
-            beer_data["productAvailability"]["deliveryAvailability"][
-                "availableForPurchase"
-            ]
-        )
-        beer.store_delivery = (
-            beer_data["productAvailability"]["storesAvailability"]["infos"][
-                "readableValue"
-            ]
-            == "Kan bestilles til alle butikker"
+        beer.post_delivery = beer_data["productAvailability"]["deliveryAvailability"][
+            "availableForPurchase"
+        ]
+        beer.store_delivery = any(
+            info.get("readableValue") == "Kan bestilles til alle butikker"
+            for info in beer_data["productAvailability"]["storesAvailability"].get(
+                "infos", []
+            )
         )
         beer.vmp_updated = timezone.now()
 
@@ -139,16 +135,14 @@ class Command(BaseCommand):
                 price_value, volume_value
             ),
             product_selection=beer_data["product_selection"],
-            post_delivery=parse_bool(
-                beer_data["productAvailability"]["deliveryAvailability"][
-                    "availableForPurchase"
-                ]
-            ),
-            store_delivery=(
-                beer_data["productAvailability"]["storesAvailability"]["infos"][
-                    "readableValue"
-                ]
-                == "Kan bestilles til alle butikker"
+            post_delivery=beer_data["productAvailability"]["deliveryAvailability"][
+                "availableForPurchase"
+            ],
+            store_delivery=any(
+                info.get("readableValue") == "Kan bestilles til alle butikker"
+                for info in beer_data["productAvailability"]["storesAvailability"].get(
+                    "infos", []
+                )
             ),
             vmp_url=f"https://www.vinmonopolet.no{beer_data['url']}",
             vmp_updated=timezone.now(),

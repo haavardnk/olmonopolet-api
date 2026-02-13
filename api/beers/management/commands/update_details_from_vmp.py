@@ -3,10 +3,16 @@ from __future__ import annotations
 from argparse import ArgumentParser
 
 import cloudscraper25
-import xmltodict
 from beers.models import Beer, ExternalAPI
 from django.core.management.base import BaseCommand
 from django.utils import timezone
+
+CHARACTERISTIC_FIELDS = {
+    "Fylde": "fullness",
+    "Sødme": "sweetness",
+    "Friskhet": "freshness",
+    "Bitterhet": "bitterness",
+}
 
 
 class Command(BaseCommand):
@@ -58,23 +64,28 @@ class Command(BaseCommand):
     def _update_product_details(self, product: Beer, url: str) -> bool:
         try:
             response = self._call_api(url, product.vmp_id)
+            content = response.get("content", {})
 
-            mapping = {
-                "fullness": "fullness",
-                "sweetness": "sweetness",
-                "freshness": "freshness",
-                "bitterness": "bitterness",
+            top_level_mapping = {
                 "color": "color",
                 "smell": "aroma",
                 "taste": "taste",
-                "matured": "storable",
                 "allergens": "allergens",
                 "method": "method",
             }
 
-            for response_key, product_attr in mapping.items():
+            for response_key, product_attr in top_level_mapping.items():
                 if response_key in response:
                     setattr(product, product_attr, response[response_key])
+
+            for char in content.get("characteristics", []):
+                field = CHARACTERISTIC_FIELDS.get(char.get("name"))
+                if field:
+                    setattr(product, field, char["value"])
+
+            storage = content.get("storagePotential")
+            if storage:
+                product.storable = storage.get("formattedValue", "")
 
             if "vintage" in response:
                 product.year = response["vintage"]
@@ -86,10 +97,13 @@ class Command(BaseCommand):
             if "acid" in response:
                 product.acid = self._parse_acid_value(response["acid"])
 
-            if "raastoff" in response and "name" in response["raastoff"]:
-                product.raw_materials = response["raastoff"]["name"]
-            if "isGoodFor" in response:
-                product.food_pairing = self._parse_food_pairing(response["isGoodFor"])
+            ingredients = content.get("ingredients", [])
+            if ingredients:
+                product.raw_materials = ingredients[0].get("formattedValue", "")
+
+            food_pairing = content.get("isGoodFor", [])
+            if food_pairing:
+                product.food_pairing = ", ".join(food["name"] for food in food_pairing)
 
             product.vmp_details_fetched = timezone.now()
             product.save()
@@ -101,16 +115,10 @@ class Command(BaseCommand):
     def _call_api(self, url: str, product_id: int) -> dict:
         req_url = f"{url}{product_id}?fields=FULL"
         scraper = cloudscraper25.create_scraper(interpreter="nodejs")
-        response_text = scraper.get(req_url).text
-        return xmltodict.parse(response_text)["product"]
+        return scraper.get(req_url, headers={"Accept": "application/json"}).json()
 
     def _parse_sugar_value(self, sugar_str: str) -> float:
         return float(sugar_str.replace("<", "").replace(",", ".").split(" ")[-1])
 
     def _parse_acid_value(self, acid_str: str) -> float:
         return float(acid_str.replace(",", "."))
-
-    def _parse_food_pairing(self, food_data) -> str:
-        if not isinstance(food_data, list):
-            return food_data["name"]
-        return ", ".join(food["name"] for food in food_data)

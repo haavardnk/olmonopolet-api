@@ -1,6 +1,7 @@
+import json
+
 import pytest
 import responses
-import xmltodict
 from beers.models import Beer, ExternalAPI, Stock, Store
 from beers.tasks import update_stock_from_vmp
 
@@ -8,61 +9,52 @@ from beers.tasks import update_stock_from_vmp
 def create_query_url(product, store_id, page):
     if "alkoholfritt" in product:
         query = (
-            ":name-asc:visibleInSearch:true:mainCategory:alkoholfritt:mainSubCategory:"
+            ":name-asc:mainCategory:alkoholfritt:mainSubCategory:"
             + product
             + ":availableInStores:"
             + str(store_id)
-            + ":"
         )
     else:
         query = (
-            ":name-asc:visibleInSearch:true:mainCategory:"
+            ":name-asc:mainCategory:"
             + product
             + ":availableInStores:"
             + str(store_id)
-            + ":"
         )
     req_url = (
-        "https://api.test.com/v4/products/search/?currentPage="
+        "https://api.test.com/v4/products/search?currentPage="
         + str(page)
-        + "&fields=FULL&pageSize=100&query="
+        + "&fields=FULL&pageSize=100&q="
         + query
     )
     return req_url
 
 
-def xml_response(product_id, stock):
+def json_response(product_id, stock):
     if stock == 0:
-        xml = xmltodict.unparse(
-            {
-                "productCategorySearchPage": {
-                    "products": [],
-                    "pagination": {"totalPages": 1},
-                },
-            }
-        )
+        data = {
+            "products": [],
+            "pagination": {"totalPages": 1},
+        }
     else:
-        xml = xmltodict.unparse(
-            {
-                "productCategorySearchPage": {
-                    "products": [
-                        {
-                            "code": product_id,
-                            "productAvailability": {
-                                "storesAvailability": {
-                                    "infos": {
-                                        "availability": "Lager: " + str(stock),
-                                    }
+        data = {
+            "products": [
+                {
+                    "code": product_id,
+                    "productAvailability": {
+                        "storesAvailability": {
+                            "infos": [
+                                {
+                                    "availability": "Lager: " + str(stock),
                                 }
-                            },
-                        },
-                        {},
-                    ],
-                    "pagination": {"totalPages": 1},
+                            ]
+                        }
+                    },
                 },
-            }
-        )
-    return xml
+            ],
+            "pagination": {"totalPages": 1},
+        }
+    return json.dumps(data)
 
 
 @pytest.fixture(autouse=True)
@@ -150,42 +142,42 @@ def test_add_stock(mocked_responses):
                 mocked_responses.add(
                     responses.GET,
                     create_query_url(product, store.store_id, 0),
-                    body=xml_response(12611502, 11),
+                    body=json_response(12611502, 11),
                     status=200,
                 )
             if product == "sider":
                 mocked_responses.add(
                     responses.GET,
                     create_query_url(product, store.store_id, 0),
-                    body=xml_response(14194601, 22),
+                    body=json_response(14194601, 22),
                     status=200,
                 )
             if product == "mjød":
                 mocked_responses.add(
                     responses.GET,
                     create_query_url(product, store.store_id, 0),
-                    body=xml_response(13863804, 33),
+                    body=json_response(13863804, 33),
                     status=200,
                 )
             if product == "alkoholfritt_alkoholfritt_øl":
                 mocked_responses.add(
                     responses.GET,
                     create_query_url(product, store.store_id, 0),
-                    body=xml_response(11983702, 44),
+                    body=json_response(11983702, 44),
                     status=200,
                 )
             if product == "alkoholfritt_alkoholfri_ingefærøl":
                 mocked_responses.add(
                     responses.GET,
                     create_query_url(product, store.store_id, 0),
-                    body=xml_response(15697202, 55),
+                    body=json_response(15697202, 55),
                     status=200,
                 )
             if product == "alkoholfritt_alkoholfri_sider":
                 mocked_responses.add(
                     responses.GET,
                     create_query_url(product, store.store_id, 0),
-                    body=xml_response(14439202, 66),
+                    body=json_response(14439202, 66),
                     status=200,
                 )
 
@@ -227,42 +219,42 @@ def test_update_and_remove_stock(mocked_responses):
                 mocked_responses.add(
                     responses.GET,
                     create_query_url(product, store.store_id, 0),
-                    body=xml_response(12611502, 22),
+                    body=json_response(12611502, 22),
                     status=200,
                 )
             if product == "sider":
                 mocked_responses.add(
                     responses.GET,
                     create_query_url(product, store.store_id, 0),
-                    body=xml_response(14194601, 0),
+                    body=json_response(14194601, 0),
                     status=200,
                 )
             if product == "mjød":
                 mocked_responses.add(
                     responses.GET,
                     create_query_url(product, store.store_id, 0),
-                    body=xml_response(13863804, 0),
+                    body=json_response(13863804, 0),
                     status=200,
                 )
             if product == "alkoholfritt_alkoholfritt_øl":
                 mocked_responses.add(
                     responses.GET,
                     create_query_url(product, store.store_id, 0),
-                    body=xml_response(11983702, 11),
+                    body=json_response(11983702, 11),
                     status=200,
                 )
             if product == "alkoholfritt_alkoholfri_ingefærøl":
                 mocked_responses.add(
                     responses.GET,
                     create_query_url(product, store.store_id, 0),
-                    body=xml_response(15697202, 0),
+                    body=json_response(15697202, 0),
                     status=200,
                 )
             if product == "alkoholfritt_alkoholfri_sider":
                 mocked_responses.add(
                     responses.GET,
                     create_query_url(product, store.store_id, 0),
-                    body=xml_response(14439202, 0),
+                    body=json_response(14439202, 0),
                     status=200,
                 )
     update_stock_from_vmp(2)

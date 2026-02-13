@@ -3,7 +3,6 @@ from __future__ import annotations
 from typing import Any
 
 import cloudscraper25
-import xmltodict
 from beers.api.utils import get_or_create_country
 from beers.models import Beer, ExternalAPI, VmpNotReleased
 from django.core.management.base import BaseCommand
@@ -50,7 +49,7 @@ class Command(BaseCommand):
         url = f"{baseurl}products/{product.id}"
 
         try:
-            response = self._call_api(url)["product"]
+            response = self._call_api(url)
 
             try:
                 beer = Beer.objects.get(vmp_id=int(response["code"]))
@@ -123,10 +122,10 @@ class Command(BaseCommand):
 
     def _call_api(self, url: str) -> dict[str, Any]:
         scraper = cloudscraper25.create_scraper(interpreter="nodejs")
-        response_text = scraper.get(url, timeout=30).text
-        return xmltodict.parse(response_text)
+        return scraper.get(
+            url, timeout=30, headers={"Accept": "application/json"}
+        ).json()
 
     def _calculate_price_per_volume(self, price: float, volume_value: float) -> float:
         volume_in_liters = volume_value / 100.0
-        return price / volume_in_liters
         return price / volume_in_liters
