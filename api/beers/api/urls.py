@@ -5,6 +5,7 @@ from beers.api.views import (
     StockChangeViewSet,
     StockViewSet,
     StoreViewSet,
+    UntappdRssFeedViewSet,
     UserListViewSet,
     WrongMatchViewSet,
 )
@@ -22,6 +23,7 @@ router.register("stockchange", StockChangeViewSet, basename="stockchange")
 router.register("release", ReleaseViewSet, basename="release")
 router.register("wrongmatch", WrongMatchViewSet, basename="wrongmatch")
 router.register("lists", UserListViewSet, basename="userlist")
+router.register("rss", UntappdRssFeedViewSet, basename="untappd-rss")
 
 urlpatterns = [
     path("", include(router.urls)),

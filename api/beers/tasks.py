@@ -107,3 +107,10 @@ def create_release(name: str, products: list[int]) -> str:
 
 def sync_tasted() -> str:
     return _call_command_with_output("sync_tasted")
+
+
+def sync_rss_feeds(user: str | None = None) -> str:
+    kwargs = {}
+    if user:
+        kwargs["user"] = user
+    return _call_command_with_output("sync_rss_feeds", **kwargs)

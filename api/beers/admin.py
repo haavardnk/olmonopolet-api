@@ -11,6 +11,7 @@ from beers.models import (
     Store,
     Tasted,
     UntappdCheckin,
+    UntappdRssFeed,
     UserList,
     UserListItem,
     VmpNotReleased,
@@ -270,6 +271,14 @@ class UserWithCheckinsAdmin(admin.ModelAdmin):
     @admin.display(ordering="unsynced_count")
     def unsynced_count(self, obj):
         return obj.unsynced_count
+
+
+@admin.register(UntappdRssFeed)
+class UntappdRssFeedAdmin(admin.ModelAdmin):
+    list_display = ("user", "feed_url", "last_synced", "active")
+    list_filter = ("active",)
+    search_fields = ("user__username", "user__email")
+    readonly_fields = ("last_synced", "created_at")
 
 
 admin.site.register(Badge)

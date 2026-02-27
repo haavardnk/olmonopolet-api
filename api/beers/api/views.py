@@ -1,43 +1,30 @@
 from __future__ import annotations
 
-from beers.api.filters import (
-    BeerFilter,
-    NullsAlwaysLastOrderingFilter,
-    StockChangeFilter,
-)
+import json
+
+from beers.api.filters import (BeerFilter, NullsAlwaysLastOrderingFilter,
+                               StockChangeFilter)
 from beers.api.pagination import LargeResultPagination, Pagination
-from beers.api.serializers import (
-    BeerSerializer,
-    CountrySerializer,
-    ItemReorderSerializer,
-    ListReorderSerializer,
-    ReleaseSerializer,
-    SharedUserListSerializer,
-    StockChangeSerializer,
-    StockSerializer,
-    StoreSerializer,
-    UserListCreateSerializer,
-    UserListItemCreateSerializer,
-    UserListItemSerializer,
-    UserListItemUpdateSerializer,
-    UserListSerializer,
-    UserListUpdateSerializer,
-    WrongMatchSerializer,
-)
+from beers.api.serializers import (BeerSerializer, CountrySerializer,
+                                   ItemReorderSerializer,
+                                   ListReorderSerializer, ReleaseSerializer,
+                                   SharedUserListSerializer,
+                                   StockChangeSerializer, StockSerializer,
+                                   StoreSerializer, UntappdRssFeedSerializer,
+                                   UserListCreateSerializer,
+                                   UserListItemCreateSerializer,
+                                   UserListItemSerializer,
+                                   UserListItemUpdateSerializer,
+                                   UserListSerializer,
+                                   UserListUpdateSerializer,
+                                   WrongMatchSerializer)
 from beers.api.utils import bulk_import_tasted, parse_untappd_file
-from beers.models import (
-    Beer,
-    Country,
-    Release,
-    Stock,
-    Store,
-    Tasted,
-    UserList,
-    UserListItem,
-    WrongMatch,
-)
+from beers.models import (Beer, Country, Release, Stock, Store, Tasted,
+                          UntappdRssFeed, UserList, UserListItem, WrongMatch)
+from beers.tasks import sync_rss_feeds
 from django.contrib.postgres.aggregates import ArrayAgg
-from django.db.models import Count, Exists, F, Max, OuterRef, Prefetch, Q, Value
+from django.db.models import (Count, Exists, F, Max, OuterRef, Prefetch, Q,
+                              Value)
 from django.db.models.functions import Greatest
 from django.db.models.manager import BaseManager
 from django_filters.rest_framework import DjangoFilterBackend
@@ -466,3 +453,57 @@ class UserListViewSet(BrowsableMixin, ModelViewSet):
 
         serializer = SharedUserListSerializer(user_list)
         return Response(serializer.data)
+
+
+class UntappdRssFeedViewSet(BrowsableMixin, ModelViewSet):
+    serializer_class = UntappdRssFeedSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    http_method_names = ["get", "post", "put", "patch", "delete"]
+
+    def get_queryset(self):
+        return UntappdRssFeed.objects.filter(user=self.request.user)
+
+    def get_object(self):
+        try:
+            return UntappdRssFeed.objects.get(user=self.request.user)
+        except UntappdRssFeed.DoesNotExist:
+            from django.http import Http404
+
+            raise Http404
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+    def create(self, request, *args, **kwargs):
+        if UntappdRssFeed.objects.filter(user=request.user).exists():
+            return Response(
+                {"error": "RSS feed already configured. Use PUT/PATCH to update."},
+                status=status.HTTP_409_CONFLICT,
+            )
+        return super().create(request, *args, **kwargs)
+
+    def list(self, request, *args, **kwargs):
+        try:
+            instance = UntappdRssFeed.objects.get(user=request.user)
+            serializer = self.get_serializer(instance)
+            return Response(serializer.data)
+        except UntappdRssFeed.DoesNotExist:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
+    @action(detail=False, methods=["post"], url_path="sync")
+    def sync(self, request):
+        if not UntappdRssFeed.objects.filter(user=request.user, active=True).exists():
+            return Response(
+                {"error": "No active RSS feed configured"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        output = sync_rss_feeds(user=request.user.username)
+        for line in reversed(output.strip().splitlines()):
+            try:
+                summary = json.loads(line)
+                summary.pop("users_affected", None)
+                return Response(summary)
+            except json.JSONDecodeError:
+                continue
+        return Response({"imported": 0, "synced": 0})

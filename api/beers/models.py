@@ -349,3 +349,16 @@ class UntappdCheckin(models.Model):
 
     def __str__(self):
         return f"{self.user.username} - untpd:{self.untpd_beer_id}"
+
+
+class UntappdRssFeed(models.Model):
+    user = models.OneToOneField(
+        "auth.User", on_delete=CASCADE, related_name="untappd_rss_feed", primary_key=True
+    )
+    feed_url = models.URLField(max_length=500)
+    last_synced = models.DateTimeField(blank=True, null=True)
+    active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.user.username} - RSS"

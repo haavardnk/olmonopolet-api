@@ -7,6 +7,7 @@ from beers.models import (
     Release,
     Stock,
     Store,
+    UntappdRssFeed,
     UserList,
     UserListItem,
     WrongMatch,
@@ -574,3 +575,17 @@ class ListReorderSerializer(serializers.Serializer):
 
 class ItemReorderSerializer(serializers.Serializer):
     item_ids = serializers.ListField(child=serializers.IntegerField())
+
+
+class UntappdRssFeedSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UntappdRssFeed
+        fields = ["feed_url", "last_synced", "active", "created_at"]
+        read_only_fields = ["last_synced", "created_at"]
+
+    def validate_feed_url(self, value: str) -> str:
+        if "untappd.com/rss/user/" not in value:
+            raise serializers.ValidationError(
+                "URL must be an Untappd RSS feed (https://untappd.com/rss/user/...)"
+            )
+        return value
