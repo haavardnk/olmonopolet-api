@@ -135,6 +135,17 @@ class UserWithTastedAdmin(admin.ModelAdmin):
     fields = ("username", "email")
     readonly_fields = ("username", "email")
     inlines = [TastedInline]
+    actions = ["delete_all_tasteds"]
+
+    def get_actions(self, request):
+        actions = super().get_actions(request)
+        actions.pop("delete_selected", None)
+        return actions
+
+    @admin.action(description="Delete all tasteds for selected users")
+    def delete_all_tasteds(self, request, queryset):
+        count, _ = Tasted.objects.filter(user__in=queryset).delete()
+        self.message_user(request, f"Deleted {count} tasteds.")
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
@@ -217,6 +228,17 @@ class UserWithListsAdmin(admin.ModelAdmin):
     fields = ("username", "email")
     readonly_fields = ("username", "email")
     inlines = [UserListInline]
+    actions = ["delete_all_lists"]
+
+    @admin.action(description="Delete all lists for selected users")
+    def delete_all_lists(self, request, queryset):
+        count, _ = UserList.objects.filter(user__in=queryset).delete()
+        self.message_user(request, f"Deleted {count} lists.")
+
+    def get_actions(self, request):
+        actions = super().get_actions(request)
+        actions.pop("delete_selected", None)
+        return actions
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
@@ -249,6 +271,11 @@ class UserWithCheckinsAdmin(admin.ModelAdmin):
     readonly_fields = ("username", "email")
     inlines = [UntappdCheckinInline]
     actions = ["delete_all_checkins"]
+
+    def get_actions(self, request):
+        actions = super().get_actions(request)
+        actions.pop("delete_selected", None)
+        return actions
 
     @admin.action(description="Delete all checkins for selected users")
     def delete_all_checkins(self, request, queryset):
