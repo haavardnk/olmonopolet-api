@@ -8,7 +8,7 @@ from beers.models import Beer, Country, Tasted, UntappdCheckin
 from django.contrib.auth.models import User
 from django.db import transaction
 
-CheckinTuple = tuple[int, float | None, datetime | None]
+CheckinTuple = tuple[int, int, float | None, datetime | None]
 _DATETIME_FORMATS = ("%Y-%m-%d %H:%M:%S", "%a, %d %b %Y %H:%M:%S %z")
 _EMPTY_SYNC_RESULT: dict[str, int] = {"synced_count": 0, "users_affected": 0}
 
@@ -62,6 +62,15 @@ def _parse_checkin_time(raw: str | int | float | None) -> datetime | None:
 
 
 def _extract_checkin_data(row: dict) -> CheckinTuple | None:
+    checkin_id = row.get("checkin_id")
+    if not checkin_id:
+        return None
+
+    try:
+        checkin_id = int(checkin_id)
+    except (ValueError, TypeError):
+        return None
+
     beer_id = row.get("bid") or row.get("beer_id")
 
     if not beer_id and (url := row.get("beer_url")):
@@ -85,7 +94,7 @@ def _extract_checkin_data(row: dict) -> CheckinTuple | None:
         except (ValueError, TypeError):
             pass
 
-    return (beer_id, rating, _parse_checkin_time(row.get("created_at")))
+    return (checkin_id, beer_id, rating, _parse_checkin_time(row.get("created_at")))
 
 
 def parse_untappd_file(uploaded_file) -> list[CheckinTuple] | None:
@@ -108,79 +117,31 @@ def parse_untappd_file(uploaded_file) -> list[CheckinTuple] | None:
     return None
 
 
-def _dedup_checkins(
-    checkins: list[CheckinTuple],
-) -> dict[int, tuple[float | None, datetime | None]]:
-    best: dict[int, tuple[float | None, datetime | None]] = {}
-    for beer_id, rating, checkin_at in checkins:
-        prev_rating, prev_at = best.get(beer_id, (None, None))
-        keep_rating = _pick_higher(prev_rating, rating)
-        keep_at = _pick_earlier(prev_at, checkin_at)
-        best[beer_id] = (keep_rating, keep_at)
-    return best
-
-
-def _pick_higher(a: float | None, b: float | None) -> float | None:
-    if a is None:
-        return b
-    if b is None:
-        return a
-    return max(a, b)
-
-
-def _pick_earlier(a: datetime | None, b: datetime | None) -> datetime | None:
-    if a is None:
-        return b
-    if b is None:
-        return a
-    return min(a, b)
-
-
-def _save_checkins(
-    user: User, deduped: dict[int, tuple[float | None, datetime | None]]
-) -> None:
-    existing = {
-        c.untpd_beer_id: c
-        for c in UntappdCheckin.objects.filter(
-            user=user, untpd_beer_id__in=deduped.keys()
+def _save_checkins(user: User, checkins: list[CheckinTuple]) -> None:
+    checkin_ids = [c[0] for c in checkins]
+    existing_ids = set(
+        UntappdCheckin.objects.filter(untpd_checkin_id__in=checkin_ids).values_list(
+            "pk", flat=True
         )
-    }
+    )
 
-    new_ids = deduped.keys() - existing.keys()
-    if new_ids:
-        UntappdCheckin.objects.bulk_create(
-            [
-                UntappdCheckin(
-                    user=user,
-                    untpd_beer_id=uid,
-                    rating=deduped[uid][0],
-                    checkin_at=deduped[uid][1],
-                )
-                for uid in new_ids
-            ]
+    to_create = [
+        UntappdCheckin(
+            untpd_checkin_id=checkin_id,
+            user=user,
+            untpd_beer_id=beer_id,
+            rating=rating,
+            checkin_at=checkin_at,
         )
-
-    to_update: list[UntappdCheckin] = []
-    for untpd_id, (rating, checkin_at) in deduped.items():
-        checkin = existing.get(untpd_id)
-        if not checkin:
-            continue
-        new_rating = _pick_higher(checkin.rating, rating)
-        new_at = _pick_earlier(checkin.checkin_at, checkin_at)
-        if new_rating != checkin.rating or new_at != checkin.checkin_at:
-            checkin.rating = new_rating
-            checkin.checkin_at = new_at
-            to_update.append(checkin)
-    if to_update:
-        UntappdCheckin.objects.bulk_update(to_update, ["rating", "checkin_at"])
+        for checkin_id, beer_id, rating, checkin_at in checkins
+        if checkin_id not in existing_ids
+    ]
+    if to_create:
+        UntappdCheckin.objects.bulk_create(to_create)
 
 
-def _sync_matched_checkins(
-    user: User, deduped: dict[int, tuple[float | None, datetime | None]]
-) -> int:
-    untpd_to_beer = {
-        b.untpd_id: b for b in Beer.objects.filter(untpd_id__in=deduped.keys())
-    }
+def _sync_matched_checkins(user: User, beer_ids: set[int]) -> int:
+    untpd_to_beer = {b.untpd_id: b for b in Beer.objects.filter(untpd_id__in=beer_ids)}
     if not untpd_to_beer:
         return 0
 
@@ -191,7 +152,7 @@ def _sync_matched_checkins(
     )
 
     tasted_to_create = [
-        Tasted(user=user, beer=beer, rating=deduped[uid][0])
+        Tasted(user=user, beer=beer)
         for uid, beer in untpd_to_beer.items()
         if uid not in existing_tasted
     ]
@@ -206,10 +167,10 @@ def _sync_matched_checkins(
 
 
 def bulk_import_tasted(user: User, checkins: list[CheckinTuple]) -> dict[str, int]:
-    deduped = _dedup_checkins(checkins)
+    beer_ids = {c[1] for c in checkins}
     with transaction.atomic():
-        _save_checkins(user, deduped)
-        imported_count = _sync_matched_checkins(user, deduped)
+        _save_checkins(user, checkins)
+        imported_count = _sync_matched_checkins(user, beer_ids)
 
     return {
         "imported_count": imported_count,
@@ -237,7 +198,7 @@ def sync_unmatched_checkins() -> dict[str, int]:
 
     tasted_to_create: list[Tasted] = []
     users_affected: set[int] = set()
-    checkin_ids_to_mark: list[int] = []
+    checkin_pks_to_mark: list[int] = []
 
     for checkin in matchable:
         key = (checkin.user_id, checkin.untpd_beer_id)
@@ -246,17 +207,16 @@ def sync_unmatched_checkins() -> dict[str, int]:
                 Tasted(
                     user_id=checkin.user_id,
                     beer=untpd_to_beer[checkin.untpd_beer_id],
-                    rating=checkin.rating,
                 )
             )
             existing_tasted.add(key)
             users_affected.add(checkin.user_id)
-        checkin_ids_to_mark.append(checkin.id)
+        checkin_pks_to_mark.append(checkin.pk)
 
     if tasted_to_create:
         Tasted.objects.bulk_create(tasted_to_create)
-    if checkin_ids_to_mark:
-        UntappdCheckin.objects.filter(id__in=checkin_ids_to_mark).update(synced=True)
+    if checkin_pks_to_mark:
+        UntappdCheckin.objects.filter(pk__in=checkin_pks_to_mark).update(synced=True)
 
     return {
         "synced_count": len(tasted_to_create),

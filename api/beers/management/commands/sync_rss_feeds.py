@@ -67,7 +67,6 @@ class Command(BaseCommand):
         )
 
         imported = 0
-        newest_date: datetime | None = None
 
         for entry in new_entries:
             checkin_url = entry.get("link", "")
@@ -83,16 +82,14 @@ class Command(BaseCommand):
             )
             if beer_id:
                 self.stdout.write(f"  {title} -> {beer_id} (rating: {rating})")
-                self._save_checkin(feed_obj.user, beer_id, rating, pub_date)
+                self._save_checkin(
+                    feed_obj.user, int(checkin_id), beer_id, rating, pub_date
+                )
                 imported += 1
             else:
                 self.stdout.write(self.style.WARNING(f"  No match: {title}"))
 
-            if pub_date and (not newest_date or pub_date > newest_date):
-                newest_date = pub_date
-
-        if newest_date:
-            feed_obj.last_synced = newest_date
+        feed_obj.last_synced = datetime.now(timezone.utc)
         feed_obj.save(update_fields=["last_synced"])
 
         self.stdout.write(
@@ -202,20 +199,19 @@ class Command(BaseCommand):
         return None
 
     def _save_checkin(
-        self, user, beer_id: int, rating: float | None, checkin_at: datetime | None
+        self,
+        user,
+        checkin_id: int,
+        beer_id: int,
+        rating: float | None,
+        checkin_at: datetime | None,
     ) -> None:
-        checkin, created = UntappdCheckin.objects.get_or_create(
-            user=user,
-            untpd_beer_id=beer_id,
-            defaults={"rating": rating, "checkin_at": checkin_at},
+        UntappdCheckin.objects.get_or_create(
+            untpd_checkin_id=checkin_id,
+            defaults={
+                "user": user,
+                "untpd_beer_id": beer_id,
+                "rating": rating,
+                "checkin_at": checkin_at,
+            },
         )
-        if not created:
-            changed = False
-            if rating and (not checkin.rating or rating > checkin.rating):
-                checkin.rating = rating
-                changed = True
-            if checkin_at and (not checkin.checkin_at or checkin_at < checkin.checkin_at):
-                checkin.checkin_at = checkin_at
-                changed = True
-            if changed:
-                checkin.save(update_fields=["rating", "checkin_at"])

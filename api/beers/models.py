@@ -271,9 +271,6 @@ class Release(models.Model):
 class Tasted(models.Model):
     user = models.ForeignKey("auth.User", on_delete=CASCADE)
     beer = models.ForeignKey(Beer, on_delete=CASCADE)
-    rating = models.FloatField(
-        validators=[MinValueValidator(0), MaxValueValidator(5)], blank=True, null=True
-    )
 
     class Meta:
         unique_together = ["user", "beer"]
@@ -330,6 +327,7 @@ class UserListItem(models.Model):
 
 
 class UntappdCheckin(models.Model):
+    untpd_checkin_id = models.IntegerField(primary_key=True)
     user = models.ForeignKey(
         "auth.User", on_delete=CASCADE, related_name="untappd_checkins"
     )
@@ -342,13 +340,13 @@ class UntappdCheckin(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        unique_together = ["user", "untpd_beer_id"]
         indexes = [
             models.Index(fields=["synced", "untpd_beer_id"]),
+            models.Index(fields=["user", "untpd_beer_id"]),
         ]
 
     def __str__(self):
-        return f"{self.user.username} - untpd:{self.untpd_beer_id}"
+        return f"{self.user.username} - checkin:{self.untpd_checkin_id}"
 
 
 class UntappdRssFeed(models.Model):

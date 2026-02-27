@@ -54,7 +54,7 @@ class UserWithCheckins(User):
 class TastedInline(admin.TabularInline):
     model = Tasted
     extra = 0
-    fields = ("beer", "rating")
+    fields = ("beer",)
     readonly_fields = ("beer",)
     raw_id_fields = ("beer",)
 
@@ -231,8 +231,8 @@ class UntappdCheckinInline(admin.TabularInline):
     model = UntappdCheckin
     extra = 0
     max_num = 50
-    fields = ("untpd_beer_id", "rating", "checkin_at", "synced")
-    readonly_fields = ("untpd_beer_id", "rating", "checkin_at", "synced")
+    fields = ("untpd_checkin_id", "untpd_beer_id", "rating", "checkin_at", "synced")
+    readonly_fields = ("untpd_checkin_id", "untpd_beer_id", "rating", "checkin_at", "synced")
     ordering = ("-checkin_at",)
 
     def get_queryset(self, request):

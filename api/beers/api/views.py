@@ -70,7 +70,6 @@ class BeerViewSet(BrowsableMixin, ModelViewSet):
         "price_per_alcohol_unit",
         "price_per_volume",
         "rating",
-        "tasted__rating",
         "vmp_name",
     ]
     filterset_class = BeerFilter
