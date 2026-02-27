@@ -10,6 +10,7 @@ from beers.models import (
     Stock,
     Store,
     Tasted,
+    UntappdCheckin,
     UserList,
     UserListItem,
     VmpNotReleased,
@@ -18,6 +19,7 @@ from beers.models import (
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 from django.contrib.auth.models import User
+from django.db import models
 from django.db.models import Count, QuerySet
 from django.http import HttpRequest
 
@@ -41,15 +43,19 @@ class UserWithLists(User):
         verbose_name_plural = "User Lists"
 
 
+class UserWithCheckins(User):
+    class Meta:
+        proxy = True
+        verbose_name = "User Checkin"
+        verbose_name_plural = "User Checkins"
+
+
 class TastedInline(admin.TabularInline):
     model = Tasted
     extra = 0
     fields = ("beer", "rating")
     readonly_fields = ("beer",)
     raw_id_fields = ("beer",)
-
-    def has_add_permission(self, request, obj=None):
-        return False
 
 
 @admin.register(Beer)
@@ -137,12 +143,6 @@ class UserWithTastedAdmin(admin.ModelAdmin):
     def tasted_count(self, obj):
         return obj.tasted_count
 
-    def has_add_permission(self, request):
-        return False
-
-    def has_delete_permission(self, request, obj=None):
-        return False
-
 
 class UserListItemInline(admin.TabularInline):
     model = UserListItem
@@ -172,9 +172,6 @@ class UserListInline(admin.TabularInline):
         return obj.items.count()
 
     item_count.short_description = "Items"
-
-    def has_add_permission(self, request, obj=None):
-        return False
 
 
 class UserListAdmin(admin.ModelAdmin):
@@ -208,15 +205,6 @@ class UserListAdmin(admin.ModelAdmin):
 
     item_count.short_description = "Items"
 
-    def has_module_permission(self, request):
-        return False
-
-    def has_view_permission(self, request, obj=None):
-        return True
-
-    def has_change_permission(self, request, obj=None):
-        return True
-
 
 admin.site.register(UserList, UserListAdmin)
 
@@ -237,11 +225,51 @@ class UserWithListsAdmin(admin.ModelAdmin):
     def list_count(self, obj):
         return obj.list_count
 
-    def has_add_permission(self, request):
-        return False
 
-    def has_delete_permission(self, request, obj=None):
-        return False
+class UntappdCheckinInline(admin.TabularInline):
+    model = UntappdCheckin
+    extra = 0
+    max_num = 50
+    fields = ("untpd_beer_id", "rating", "checkin_at", "synced")
+    readonly_fields = ("untpd_beer_id", "rating", "checkin_at", "synced")
+    ordering = ("-checkin_at",)
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        limited_ids = list(qs.order_by("-checkin_at").values_list("pk", flat=True)[:50])
+        return qs.filter(pk__in=limited_ids).order_by("-checkin_at")
+
+
+@admin.register(UserWithCheckins)
+class UserWithCheckinsAdmin(admin.ModelAdmin):
+    list_display = ("username", "email", "checkin_count", "unsynced_count")
+    search_fields = ("username", "email")
+    fields = ("username", "email")
+    readonly_fields = ("username", "email")
+    inlines = [UntappdCheckinInline]
+    actions = ["delete_all_checkins"]
+
+    @admin.action(description="Delete all checkins for selected users")
+    def delete_all_checkins(self, request, queryset):
+        count, _ = UntappdCheckin.objects.filter(user__in=queryset).delete()
+        self.message_user(request, f"Deleted {count} checkins.")
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        return qs.annotate(
+            checkin_count=Count("untappd_checkins"),
+            unsynced_count=Count(
+                "untappd_checkins", filter=models.Q(untappd_checkins__synced=False)
+            ),
+        ).filter(checkin_count__gt=0)
+
+    @admin.display(ordering="checkin_count")
+    def checkin_count(self, obj):
+        return obj.checkin_count
+
+    @admin.display(ordering="unsynced_count")
+    def unsynced_count(self, obj):
+        return obj.unsynced_count
 
 
 admin.site.register(Badge)

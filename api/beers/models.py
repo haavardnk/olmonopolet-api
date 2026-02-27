@@ -327,3 +327,25 @@ class UserListItem(models.Model):
 
     def __str__(self):
         return f"{self.list.name} - {self.product_id}"
+
+
+class UntappdCheckin(models.Model):
+    user = models.ForeignKey(
+        "auth.User", on_delete=CASCADE, related_name="untappd_checkins"
+    )
+    untpd_beer_id = models.IntegerField()
+    rating = models.FloatField(
+        validators=[MinValueValidator(0), MaxValueValidator(5)], blank=True, null=True
+    )
+    checkin_at = models.DateTimeField(blank=True, null=True)
+    synced = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ["user", "untpd_beer_id"]
+        indexes = [
+            models.Index(fields=["synced", "untpd_beer_id"]),
+        ]
+
+    def __str__(self):
+        return f"{self.user.username} - untpd:{self.untpd_beer_id}"

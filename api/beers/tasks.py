@@ -103,3 +103,7 @@ def create_release(name: str, products: list[int]) -> str:
         name=name,
         products=products,
     )
+
+
+def sync_tasted() -> str:
+    return _call_command_with_output("sync_tasted")
