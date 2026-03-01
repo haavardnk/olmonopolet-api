@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import re
+
+import requests as http_requests
 from beers.models import (
     Badge,
     Beer,
@@ -588,4 +591,23 @@ class UntappdRssFeedSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 "URL must be an Untappd RSS feed (https://untappd.com/rss/user/...)"
             )
+        match = re.search(r"untappd\.com/rss/user/([^?/]+)", value)
+        if not match:
+            raise serializers.ValidationError("Could not extract username from RSS URL")
+        username = match.group(1)
+        try:
+            resp = http_requests.get(
+                f"https://untappd.com/user/{username}",
+                headers={"User-Agent": "Mozilla/5.0"},
+                timeout=10,
+                allow_redirects=True,
+            )
+            if resp.status_code == 404 or "set their account to be private" in resp.text:
+                raise serializers.ValidationError(
+                    "Untappd profile is private. Set your profile to public to use RSS sync."
+                )
+        except serializers.ValidationError:
+            raise
+        except Exception:
+            pass
         return value
