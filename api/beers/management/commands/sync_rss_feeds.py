@@ -57,7 +57,7 @@ class Command(BaseCommand):
             )
             return 0
 
-        new_entries = self._filter_new_entries(parsed.entries, feed_obj.last_synced)
+        new_entries = self._filter_new_entries(parsed.entries)
         if not new_entries:
             self.stdout.write(f"No new entries for {feed_obj.user.username}")
             return 0
@@ -89,26 +89,30 @@ class Command(BaseCommand):
             else:
                 self.stdout.write(self.style.WARNING(f"  No match: {title}"))
 
-        feed_obj.last_synced = datetime.now(timezone.utc)
-        feed_obj.save(update_fields=["last_synced"])
+        if imported > 0:
+            feed_obj.last_synced = datetime.now(timezone.utc)
+            feed_obj.save(update_fields=["last_synced"])
 
         self.stdout.write(
             f"Imported {imported} checkins for {feed_obj.user.username}"
         )
         return imported
 
-    def _filter_new_entries(
-        self, entries: list, last_synced: datetime | None
-    ) -> list:
-        if not last_synced:
-            return list(entries)
-
-        new: list = []
+    def _filter_new_entries(self, entries: list) -> list:
+        checkin_ids: list[int] = []
+        entry_map: dict[int, dict] = {}
         for entry in entries:
-            pub_date = self._parse_pub_date(entry)
-            if pub_date and pub_date > last_synced:
-                new.append(entry)
-        return new
+            cid = self._extract_checkin_id(entry.get("link", ""))
+            if cid:
+                int_cid = int(cid)
+                checkin_ids.append(int_cid)
+                entry_map[int_cid] = entry
+
+        existing = set(
+            UntappdCheckin.objects.filter(untpd_checkin_id__in=checkin_ids)
+            .values_list("untpd_checkin_id", flat=True)
+        )
+        return [entry_map[cid] for cid in checkin_ids if cid not in existing]
 
     def _extract_checkin_id(self, link: str) -> str | None:
         match = re.search(r"/checkin/(\d+)", link)
@@ -129,6 +133,13 @@ class Command(BaseCommand):
     ) -> tuple[int | None, float | None]:
         try:
             response = scraper.get(checkin_url, timeout=15)
+            if response.status_code != 200:
+                self.stdout.write(
+                    self.style.ERROR(
+                        f"  HTTP {response.status_code} for checkin {checkin_id}"
+                    )
+                )
+                return None, None
             soup = BeautifulSoup(response.text, "html.parser")
         except Exception as e:
             self.stdout.write(
