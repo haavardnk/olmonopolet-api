@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 
+import feedparser
 import requests as http_requests
 from beers.models import (
     Badge,
@@ -589,11 +590,15 @@ class UntappdRssFeedSerializer(serializers.ModelSerializer):
     def validate_feed_url(self, value: str) -> str:
         if "untappd.com/rss/user/" not in value:
             raise serializers.ValidationError(
-                "URL must be an Untappd RSS feed (https://untappd.com/rss/user/...)"
+                "URL må være en Untappd RSS-feed (https://untappd.com/rss/user/...)"
             )
         match = re.search(r"untappd\.com/rss/user/([^?/]+)", value)
         if not match:
-            raise serializers.ValidationError("Could not extract username from RSS URL")
+            raise serializers.ValidationError("Kunne ikke hente brukernavn fra RSS-URL")
+        if "key=" not in value:
+            raise serializers.ValidationError(
+                "RSS-URL mangler nøkkelparameter. Bruk den fullstendige URLen fra Untappd RSS-innstillinger."
+            )
         username = match.group(1)
         try:
             resp = http_requests.get(
@@ -602,9 +607,22 @@ class UntappdRssFeedSerializer(serializers.ModelSerializer):
                 timeout=10,
                 allow_redirects=True,
             )
-            if resp.status_code == 404 or "set their account to be private" in resp.text:
+            if (
+                resp.status_code == 404
+                or "set their account to be private" in resp.text
+            ):
                 raise serializers.ValidationError(
-                    "Untappd profile is private. Set your profile to public to use RSS sync."
+                    "Untappd-profilen er privat. Sett profilen til offentlig for å bruke RSS-synkronisering."
+                )
+        except serializers.ValidationError:
+            raise
+        except Exception:
+            pass
+        try:
+            parsed = feedparser.parse(value)
+            if parsed.bozo and not parsed.entries:
+                raise serializers.ValidationError(
+                    "RSS-feeden kunne ikke lastes. Kontroller at URLen er riktig."
                 )
         except serializers.ValidationError:
             raise
