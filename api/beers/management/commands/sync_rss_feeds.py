@@ -60,6 +60,8 @@ class Command(BaseCommand):
         new_entries = self._filter_new_entries(parsed.entries)
         if not new_entries:
             self.stdout.write(f"No new entries for {feed_obj.user.username}")
+            feed_obj.last_synced = datetime.now(timezone.utc)
+            feed_obj.save(update_fields=["last_synced"])
             return 0
 
         self.stdout.write(
@@ -89,9 +91,8 @@ class Command(BaseCommand):
             else:
                 self.stdout.write(self.style.WARNING(f"  No match: {title}"))
 
-        if imported > 0:
-            feed_obj.last_synced = datetime.now(timezone.utc)
-            feed_obj.save(update_fields=["last_synced"])
+        feed_obj.last_synced = datetime.now(timezone.utc)
+        feed_obj.save(update_fields=["last_synced"])
 
         self.stdout.write(f"Imported {imported} checkins for {feed_obj.user.username}")
         return imported
