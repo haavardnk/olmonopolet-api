@@ -76,7 +76,10 @@ class BeerViewSet(BrowsableMixin, ModelViewSet):
 
     def get_queryset(self) -> BaseManager[Beer]:
         queryset = Beer.objects.all()
-        queryset = queryset.prefetch_related("badge_set", "stock_set")
+        queryset = queryset.select_related("country").prefetch_related(
+            "badge_set",
+            Prefetch("stock_set", queryset=Stock.objects.select_related("store")),
+        )
 
         if self.request.user and self.request.user.is_authenticated:
             user_tasted_subquery = Tasted.objects.filter(
@@ -231,7 +234,6 @@ class ReleaseViewSet(BrowsableMixin, ModelViewSet):
         return (
             Release.objects.filter(active=True)
             .order_by("-release_date")
-            .prefetch_related("beer")
             .annotate(
                 product_count=Count("beer", distinct=True),
                 beer_count=Count(

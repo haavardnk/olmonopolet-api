@@ -39,8 +39,7 @@ class BeerSerializer(DynamicFieldsMixin, serializers.ModelSerializer):
     user_tasted = serializers.BooleanField(read_only=True)
 
     def get_badges(self, beer: Beer):
-        badges_queryset = Badge.objects.filter(beer=beer)
-        serializer = BadgeSerializer(instance=badges_queryset, many=True)
+        serializer = BadgeSerializer(instance=beer.badge_set.all(), many=True)
         return serializer.data
 
     def get_stock(self, beer: Beer) -> int | None:
@@ -48,22 +47,17 @@ class BeerSerializer(DynamicFieldsMixin, serializers.ModelSerializer):
             "request"
         ].query_params.get("check_store")
         if store is not None and len(store.split(",")) < 2:
-            try:
-                stock = Stock.objects.get(beer=beer, store=store)
-                return stock.quantity
-            except Stock.DoesNotExist:
-                return None
+            for s in beer.stock_set.all():
+                if str(s.store_id) == store:
+                    return s.quantity
+            return None
         return None
 
     def get_all_stock(self, beer: Beer):
         all_stock = self.context["request"].query_params.get("all_stock")
         if all_stock and parse_bool(all_stock):
-            try:
-                stock_queryset = Stock.objects.filter(beer=beer).exclude(quantity=0)
-                serializer = AllStockSerializer(instance=stock_queryset, many=True)
-                return serializer.data
-            except Stock.DoesNotExist:
-                return None
+            stocked = [s for s in beer.stock_set.all() if s.quantity != 0]
+            return AllStockSerializer(instance=stocked, many=True).data
         return None
 
     class Meta:
@@ -258,7 +252,6 @@ class ReleaseSerializer(DynamicFieldsMixin, serializers.ModelSerializer):
             "product_stats",
             "product_selection",
             "product_selections",
-            "beer",
             "is_christmas_release",
         ]
 
@@ -376,14 +369,13 @@ class UserListSerializer(serializers.ModelSerializer):
         total_bottles = items.aggregate(total=models.Sum("quantity"))["total"] or 0
         years = items.exclude(year__isnull=True).values_list("year", flat=True)
 
-        total_value = 0
-        for item in items:
-            try:
-                beer = Beer.objects.get(vmp_id=item.product_id)
-                if beer.price:
-                    total_value += item.quantity * beer.price
-            except Beer.DoesNotExist:
-                pass
+        product_ids = [item.product_id for item in items]
+        prices = dict(
+            Beer.objects.filter(vmp_id__in=product_ids).values_list("vmp_id", "price")
+        )
+        total_value = sum(
+            item.quantity * (prices.get(item.product_id) or 0) for item in items
+        )
 
         return {
             "total_bottles": total_bottles,
@@ -404,14 +396,14 @@ class UserListSerializer(serializers.ModelSerializer):
         if obj.list_type != UserList.ListType.SHOPPING:
             return None
 
-        total = 0
-        for item in obj.items.all():
-            try:
-                beer = Beer.objects.get(vmp_id=item.product_id)
-                if beer.price:
-                    total += item.quantity * beer.price
-            except Beer.DoesNotExist:
-                pass
+        items = list(obj.items.all())
+        product_ids = [item.product_id for item in items]
+        prices = dict(
+            Beer.objects.filter(vmp_id__in=product_ids).values_list("vmp_id", "price")
+        )
+        total = sum(
+            item.quantity * (prices.get(item.product_id) or 0) for item in items
+        )
         return round(total, 2)
 
     def to_representation(self, instance):
@@ -532,14 +524,13 @@ class SharedUserListSerializer(serializers.ModelSerializer):
         total_bottles = items.aggregate(total=models.Sum("quantity"))["total"] or 0
         years = items.exclude(year__isnull=True).values_list("year", flat=True)
 
-        total_value = 0
-        for item in items:
-            try:
-                beer = Beer.objects.get(vmp_id=item.product_id)
-                if beer.price:
-                    total_value += item.quantity * beer.price
-            except Beer.DoesNotExist:
-                pass
+        product_ids = [item.product_id for item in items]
+        prices = dict(
+            Beer.objects.filter(vmp_id__in=product_ids).values_list("vmp_id", "price")
+        )
+        total_value = sum(
+            item.quantity * (prices.get(item.product_id) or 0) for item in items
+        )
 
         return {
             "total_bottles": total_bottles,
@@ -552,14 +543,14 @@ class SharedUserListSerializer(serializers.ModelSerializer):
         if obj.list_type != UserList.ListType.SHOPPING:
             return None
 
-        total = 0
-        for item in obj.items.all():
-            try:
-                beer = Beer.objects.get(vmp_id=item.product_id)
-                if beer.price:
-                    total += item.quantity * beer.price
-            except Beer.DoesNotExist:
-                pass
+        items = list(obj.items.all())
+        product_ids = [item.product_id for item in items]
+        prices = dict(
+            Beer.objects.filter(vmp_id__in=product_ids).values_list("vmp_id", "price")
+        )
+        total = sum(
+            item.quantity * (prices.get(item.product_id) or 0) for item in items
+        )
         return round(total, 2)
 
     def to_representation(self, instance):
