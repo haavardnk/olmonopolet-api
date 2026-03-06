@@ -369,12 +369,12 @@ class UserListSerializer(serializers.ModelSerializer):
         total_bottles = items.aggregate(total=models.Sum("quantity"))["total"] or 0
         years = items.exclude(year__isnull=True).values_list("year", flat=True)
 
-        product_ids = [item.product_id for item in items]
+        product_ids = [int(item.product_id) for item in items]
         prices = dict(
             Beer.objects.filter(vmp_id__in=product_ids).values_list("vmp_id", "price")
         )
         total_value = sum(
-            item.quantity * (prices.get(item.product_id) or 0) for item in items
+            item.quantity * (prices.get(int(item.product_id)) or 0) for item in items
         )
 
         return {
@@ -397,12 +397,12 @@ class UserListSerializer(serializers.ModelSerializer):
             return None
 
         items = list(obj.items.all())
-        product_ids = [item.product_id for item in items]
+        product_ids = [int(item.product_id) for item in items]
         prices = dict(
             Beer.objects.filter(vmp_id__in=product_ids).values_list("vmp_id", "price")
         )
         total = sum(
-            item.quantity * (prices.get(item.product_id) or 0) for item in items
+            item.quantity * (prices.get(int(item.product_id)) or 0) for item in items
         )
         return round(total, 2)
 
@@ -524,12 +524,12 @@ class SharedUserListSerializer(serializers.ModelSerializer):
         total_bottles = items.aggregate(total=models.Sum("quantity"))["total"] or 0
         years = items.exclude(year__isnull=True).values_list("year", flat=True)
 
-        product_ids = [item.product_id for item in items]
+        product_ids = [int(item.product_id) for item in items]
         prices = dict(
             Beer.objects.filter(vmp_id__in=product_ids).values_list("vmp_id", "price")
         )
         total_value = sum(
-            item.quantity * (prices.get(item.product_id) or 0) for item in items
+            item.quantity * (prices.get(int(item.product_id)) or 0) for item in items
         )
 
         return {
@@ -544,12 +544,12 @@ class SharedUserListSerializer(serializers.ModelSerializer):
             return None
 
         items = list(obj.items.all())
-        product_ids = [item.product_id for item in items]
+        product_ids = [int(item.product_id) for item in items]
         prices = dict(
             Beer.objects.filter(vmp_id__in=product_ids).values_list("vmp_id", "price")
         )
         total = sum(
-            item.quantity * (prices.get(item.product_id) or 0) for item in items
+            item.quantity * (prices.get(int(item.product_id)) or 0) for item in items
         )
         return round(total, 2)
 
