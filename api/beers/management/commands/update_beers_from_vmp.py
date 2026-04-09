@@ -31,7 +31,6 @@ class Command(BaseCommand):
         ]
 
         for product in products:
-            self.stdout.write(f"Processing product category: {product}")
             product_updated, product_created = self._process_product_category(
                 url, product
             )
@@ -53,7 +52,8 @@ class Command(BaseCommand):
 
             for page in range(total_pages):
                 try:
-                    response, _ = self._call_api(url, page, product)
+                    if page > 0:
+                        response, _ = self._call_api(url, page, product)
 
                     for beer_data in response.get("products", []):
                         try:
@@ -128,7 +128,7 @@ class Command(BaseCommand):
             vmp_id=int(beer_data["code"]),
             vmp_name=beer_data["name"],
             main_category=beer_data["main_category"]["name"],
-            country=beer_data["main_country"]["name"],
+            country=get_or_create_country(beer_data["main_country"]["name"]),
             price=price_value,
             volume=volume_value / 100.0,
             price_per_volume=self._calculate_price_per_volume(
