@@ -137,7 +137,7 @@ def _save_checkins(user: User, checkins: list[CheckinTuple]) -> None:
         if checkin_id not in existing_ids
     ]
     if to_create:
-        UntappdCheckin.objects.bulk_create(to_create)
+        UntappdCheckin.objects.bulk_create(to_create, ignore_conflicts=True)
 
 
 def _sync_matched_checkins(user: User, beer_ids: set[int]) -> int:
