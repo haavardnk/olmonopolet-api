@@ -126,9 +126,9 @@ class Beer(DirtyFieldsMixin, models.Model):
                 "untpd_url" in dirty_fields
                 and len(dirty_fields) == 1
                 and self.untpd_url is not None
-                and self.untpd_id != self.untpd_url.split("/")[-1]
+                and self.untpd_id != int(self.untpd_url.split("/")[-1])
             ):
-                self.untpd_id = self.untpd_url.split("/")[-1]
+                self.untpd_id = int(self.untpd_url.split("/")[-1])
                 self.prioritize_recheck = True
                 self.verified_match = True
                 self.match_manually = False
@@ -182,7 +182,7 @@ class Store(models.Model):
 
 class Stock(models.Model):
     store = models.ForeignKey(Store, on_delete=models.CASCADE)
-    beer = models.ForeignKey(Beer, on_delete=models.CASCADE)
+    beer = models.ForeignKey(Beer, on_delete=models.CASCADE, related_name="stock_set")
     quantity = models.IntegerField()
 
     stock_updated = models.DateTimeField(auto_now=True)
@@ -251,7 +251,7 @@ class VmpNotReleased(models.Model):
 
 
 class Badge(models.Model):
-    beer = models.ForeignKey(Beer, on_delete=CASCADE)
+    beer = models.ForeignKey(Beer, on_delete=CASCADE, related_name="badge_set")
     text = models.CharField(max_length=100)
     type = models.CharField(max_length=50)
 

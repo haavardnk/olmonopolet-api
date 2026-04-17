@@ -68,6 +68,8 @@ class TestCreateNewBeer:
         beer = cmd._create_new_beer(BEER_DATA)
 
         expected = 59.90 / 0.5
+        if beer.price_per_volume is None:
+            raise ValueError("price_per_volume should not be None")
         assert abs(beer.price_per_volume - expected) < 0.01
 
     @responses.activate

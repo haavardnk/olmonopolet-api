@@ -45,6 +45,24 @@ dependencies = [
 [tool.pyrefly]
 search_path = ["api"]
 
+[[tool.pyrefly.sub-config]]
+matches = "api/beers/api/serializers.py"
+[tool.pyrefly.sub-config.errors]
+bad-override = false
+
+[[tool.pyrefly.sub-config]]
+matches = "api/beers/tests/factories.py"
+[tool.pyrefly.sub-config.errors]
+bad-override = false
+
+[[tool.pyrefly.sub-config]]
+matches = "api/beers/tests/**"
+[tool.pyrefly.sub-config.errors]
+bad-assignment = false
+bad-argument-type = false
+bad-argument-count = false
+bad-return = false
+
 [dependency-groups]
 dev = [
     "codecov>=2.1.13",

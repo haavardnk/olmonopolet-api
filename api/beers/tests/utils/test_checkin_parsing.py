@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 
 import pytest
 from beers.api.utils import (
+    CheckinTuple,
     _extract_checkin_data,
     _parse_checkin_time,
     bulk_import_tasted,
@@ -135,7 +136,7 @@ class TestBulkImportTasted:
     def test_imports_matched_checkins(self) -> None:
         user = UserFactory()
         beer = BeerFactory(untpd_id=500)
-        checkins = [
+        checkins: list[CheckinTuple] = [
             (1001, 500, 4.5, datetime(2024, 1, 1, tzinfo=timezone.utc)),
         ]
 
@@ -149,7 +150,7 @@ class TestBulkImportTasted:
     def test_duplicate_checkins_skipped(self) -> None:
         user = UserFactory()
         BeerFactory(untpd_id=500)
-        checkins = [
+        checkins: list[CheckinTuple] = [
             (1001, 500, 4.5, datetime(2024, 1, 1, tzinfo=timezone.utc)),
         ]
         bulk_import_tasted(user, checkins)
@@ -160,7 +161,7 @@ class TestBulkImportTasted:
 
     def test_unmatched_beer_saved_not_synced(self) -> None:
         user = UserFactory()
-        checkins = [
+        checkins: list[CheckinTuple] = [
             (2001, 99999, 3.0, None),
         ]
 

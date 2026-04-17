@@ -4,6 +4,7 @@ from beers.models import Beer
 from beers.tests.factories import BeerFactory, StockFactory, StoreFactory
 from django.test import RequestFactory
 from rest_framework.request import Request
+from rest_framework.views import APIView
 
 
 @pytest.mark.django_db
@@ -99,7 +100,7 @@ class TestNullsAlwaysLastOrderingFilter:
 
         ordering_filter = NullsAlwaysLastOrderingFilter()
 
-        class FakeView:
+        class FakeView(APIView):
             ordering_fields = ["rating"]
 
         request = self._make_request("rating")
@@ -117,7 +118,7 @@ class TestNullsAlwaysLastOrderingFilter:
 
         ordering_filter = NullsAlwaysLastOrderingFilter()
 
-        class FakeView:
+        class FakeView(APIView):
             ordering_fields = ["rating"]
 
         request = self._make_request("-rating")
@@ -134,7 +135,7 @@ class TestNullsAlwaysLastOrderingFilter:
 
         ordering_filter = NullsAlwaysLastOrderingFilter()
 
-        class FakeView:
+        class FakeView(APIView):
             ordering_fields = ["price_per_alcohol_unit"]
 
         request = self._make_request("price_per_alcohol_unit")

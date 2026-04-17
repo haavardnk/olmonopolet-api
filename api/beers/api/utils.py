@@ -201,16 +201,16 @@ def sync_unmatched_checkins() -> dict[str, int]:
     checkin_pks_to_mark: list[int] = []
 
     for checkin in matchable:
-        key = (checkin.user_id, checkin.untpd_beer_id)
+        key = (checkin.user.id, checkin.untpd_beer_id)
         if key not in existing_tasted:
             tasted_to_create.append(
                 Tasted(
-                    user_id=checkin.user_id,
+                    user_id=checkin.user.id,
                     beer=untpd_to_beer[checkin.untpd_beer_id],
                 )
             )
             existing_tasted.add(key)
-            users_affected.add(checkin.user_id)
+            users_affected.add(checkin.user.id)
         checkin_pks_to_mark.append(checkin.pk)
 
     if tasted_to_create:
