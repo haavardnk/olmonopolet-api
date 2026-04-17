@@ -78,7 +78,7 @@ class BeerFilter(flt.FilterSet):
         for store_id in value.split(","):
             store_id = store_id.strip()
             if store_id.isdigit():
-                query |= Q(stock__store__exact=int(store_id)) & ~Q(stock__quantity=0)
+                query |= Q(stock_set__store__exact=int(store_id)) & ~Q(stock_set__quantity=0)
         return queryset.filter(query).distinct()
 
     def custom_country_filter(
