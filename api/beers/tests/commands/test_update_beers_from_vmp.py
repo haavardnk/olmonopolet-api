@@ -1,10 +1,8 @@
-import json
-
+import cloudscraper25
 import pytest
 import responses
 from beers.management.commands.update_beers_from_vmp import Command
 from beers.models import Beer, Country, ExternalAPI
-
 
 BEER_DATA = {
     "code": "9999",
@@ -87,8 +85,11 @@ class TestCreateNewBeer:
 
         cmd = Command()
         cmd.stdout = __import__("io").StringIO()
+
+        scraper = cloudscraper25.create_scraper()
+
         updated, created = cmd._process_product_category(
-            "https://api.test.com/v4/products/search", "øl"
+            scraper, "https://api.test.com/v4/products/search", "øl"
         )
 
         assert created == 1

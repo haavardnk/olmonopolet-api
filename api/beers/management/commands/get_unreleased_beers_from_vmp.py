@@ -30,8 +30,14 @@ class Command(BaseCommand):
 
         self.stdout.write(f"Processing {products.count()} unreleased products...")
 
+        scraper = cloudscraper25.create_scraper(
+            interpreter="nodejs",
+            browser="chrome",
+            enable_stealth=True,
+        )
+
         for product in products:
-            was_updated, was_created = self._process_product(product, baseurl)
+            was_updated, was_created = self._process_product(product, baseurl, scraper)
             if was_updated:
                 updated += 1
             elif was_created:
@@ -44,26 +50,24 @@ class Command(BaseCommand):
         )
 
     def _process_product(
-        self, product: VmpNotReleased, baseurl: str
+        self,
+        product: VmpNotReleased,
+        baseurl: str,
+        scraper: cloudscraper25.CloudScraper,
     ) -> tuple[bool, bool]:
         url = f"{baseurl}products/{product.id}"
+        response = self._call_api(url, scraper)
 
         try:
-            response = self._call_api(url)
+            beer = Beer.objects.get(vmp_id=int(response["code"]))
+            self._update_existing_beer(beer, response)
+            product.delete()
+            return True, False
 
-            try:
-                beer = Beer.objects.get(vmp_id=int(response["code"]))
-                self._update_existing_beer(beer, response)
-                product.delete()
-                return True, False
-
-            except Beer.DoesNotExist:
-                self._create_new_beer(response)
-                product.delete()
-                return False, True
-
-        except Exception:
-            return False, False
+        except Beer.DoesNotExist:
+            self._create_new_beer(response)
+            product.delete()
+            return False, True
 
     def _update_existing_beer(self, beer: Beer, response: dict[str, Any]) -> None:
         beer.vmp_name = response["name"]
@@ -120,8 +124,9 @@ class Command(BaseCommand):
         beer.save()
         return beer
 
-    def _call_api(self, url: str) -> dict[str, Any]:
-        scraper = cloudscraper25.create_scraper(interpreter="nodejs")
+    def _call_api(
+        self, url: str, scraper: cloudscraper25.CloudScraper
+    ) -> dict[str, Any]:
         return scraper.get(
             url, timeout=30, headers={"Accept": "application/json"}
         ).json()

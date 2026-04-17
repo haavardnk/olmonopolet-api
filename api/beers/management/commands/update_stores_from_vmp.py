@@ -20,14 +20,13 @@ class Command(BaseCommand):
 
         updated = 0
         created = 0
-        failed = 0
 
-        scraper = cloudscraper25.create_scraper(interpreter="nodejs")
+        scraper = cloudscraper25.create_scraper(
+            interpreter="nodejs",
+            browser="chrome",
+            enable_stealth=True,
+        )
         stores_data = self._fetch_stores_list(baseurl, scraper)
-
-        if not stores_data:
-            self.stdout.write(self.style.ERROR("Failed to fetch stores list from API"))
-            return
 
         self.stdout.write(f"Processing {len(stores_data)} stores...")
 
@@ -37,12 +36,10 @@ class Command(BaseCommand):
                 updated += 1
             elif result == "created":
                 created += 1
-            else:
-                failed += 1
 
         self.stdout.write(
             self.style.SUCCESS(
-                f"Updated: {updated}, Created: {created}, Failed: {failed}."
+                f"Updated: {updated}, Created: {created}."
             )
         )
 
@@ -50,59 +47,36 @@ class Command(BaseCommand):
         self, baseurl: str, scraper: CloudScraper, store_data: dict[str, Any]
     ) -> str:
         store_code = store_data["code"]
-
         store_details = self._fetch_store_details(baseurl, scraper, store_code)
-        if not store_details:
-            return "failed"
 
         try:
-            try:
-                store = Store.objects.get(store_id=store_code)
-                self._update_existing_store(store, store_details)
-                return "updated"
+            store = Store.objects.get(store_id=store_code)
+            self._update_existing_store(store, store_details)
+            return "updated"
 
-            except Store.DoesNotExist:
-                self._create_new_store(store_code, store_details)
-                return "created"
-
-        except Exception as e:
-            self.stdout.write(
-                self.style.ERROR(f"Error processing store {store_code}: {e}")
-            )
-            return "failed"
+        except Store.DoesNotExist:
+            self._create_new_store(store_code, store_details)
+            return "created"
 
     def _fetch_stores_list(
         self, baseurl: str, scraper: CloudScraper
-    ) -> list[dict[str, Any]] | None:
+    ) -> list[dict[str, Any]]:
         url = f"{baseurl}products/search?currentPage=0&fields=FULL&pageSize=1&q="
+        response = scraper.get(url, headers={"Accept": "application/json"}).json()
 
-        try:
-            response = scraper.get(url, headers={"Accept": "application/json"}).json()
-            for facet in response.get("facets", []):
-                if facet.get("code") == "availableInStores":
-                    return facet.get("values", [])
-            self.stdout.write(
-                self.style.ERROR("No 'availableInStores' facet found in response")
-            )
-            return None
-        except Exception as e:
-            self.stdout.write(self.style.ERROR(f"Error fetching stores list: {e}"))
-            return None
+        for facet in response.get("facets", []):
+            if facet.get("code") == "availableInStores":
+                return facet.get("values", [])
+
+        raise ValueError("No 'availableInStores' facet found in API response")
 
     def _fetch_store_details(
         self, baseurl: str, scraper: CloudScraper, store_code: str
-    ) -> dict[str, Any] | None:
+    ) -> dict[str, Any]:
         detail_url = f"{baseurl}stores/{store_code}"
-
-        try:
-            return scraper.get(
-                detail_url, headers={"Accept": "application/json"}
-            ).json()
-        except Exception as e:
-            self.stdout.write(
-                self.style.ERROR(f"Error fetching store details for {store_code}: {e}")
-            )
-            return None
+        return scraper.get(
+            detail_url, headers={"Accept": "application/json"}
+        ).json()
 
     def _update_existing_store(
         self, store: Store, store_details: dict[str, Any]

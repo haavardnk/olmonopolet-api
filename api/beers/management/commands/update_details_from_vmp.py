@@ -44,11 +44,17 @@ class Command(BaseCommand):
 
         self.stdout.write(f"Processing {len(products)} products...")
 
+        scraper = cloudscraper25.create_scraper(
+            interpreter="nodejs",
+            browser="chrome",
+            enable_stealth=True,
+        )
+
         updated = 0
         failed = 0
 
         for product in products:
-            if self._update_product_details(product, url):
+            if self._update_product_details(product, url, scraper):
                 updated += 1
             else:
                 failed += 1
@@ -61,60 +67,59 @@ class Command(BaseCommand):
             )
         )
 
-    def _update_product_details(self, product: Beer, url: str) -> bool:
-        try:
-            response = self._call_api(url, product.vmp_id)
-            content = response.get("content", {})
+    def _update_product_details(
+        self, product: Beer, url: str, scraper: cloudscraper25.CloudScraper
+    ) -> bool:
+        response = self._call_api(url, product.vmp_id, scraper)
+        content = response.get("content", {})
 
-            top_level_mapping = {
-                "color": "color",
-                "smell": "aroma",
-                "taste": "taste",
-                "allergens": "allergens",
-                "method": "method",
-            }
+        top_level_mapping = {
+            "color": "color",
+            "smell": "aroma",
+            "taste": "taste",
+            "allergens": "allergens",
+            "method": "method",
+        }
 
-            for response_key, product_attr in top_level_mapping.items():
-                if response_key in response:
-                    setattr(product, product_attr, response[response_key])
+        for response_key, product_attr in top_level_mapping.items():
+            if response_key in response:
+                setattr(product, product_attr, response[response_key])
 
-            for char in content.get("characteristics", []):
-                field = CHARACTERISTIC_FIELDS.get(char.get("name"))
-                if field:
-                    setattr(product, field, char["value"])
+        for char in content.get("characteristics", []):
+            field = CHARACTERISTIC_FIELDS.get(char.get("name"))
+            if field:
+                setattr(product, field, char["value"])
 
-            storage = content.get("storagePotential")
-            if storage:
-                product.storable = storage.get("formattedValue", "")
+        storage = content.get("storagePotential")
+        if storage:
+            product.storable = storage.get("formattedValue", "")
 
-            if "vintage" in response:
-                product.year = response["vintage"]
-            elif "year" in response:
-                product.year = response["year"]
+        if "vintage" in response:
+            product.year = response["vintage"]
+        elif "year" in response:
+            product.year = response["year"]
 
-            if "sugar" in response:
-                product.sugar = self._parse_sugar_value(response["sugar"])
-            if "acid" in response:
-                product.acid = self._parse_acid_value(response["acid"])
+        if "sugar" in response:
+            product.sugar = self._parse_sugar_value(response["sugar"])
+        if "acid" in response:
+            product.acid = self._parse_acid_value(response["acid"])
 
-            ingredients = content.get("ingredients", [])
-            if ingredients:
-                product.raw_materials = ingredients[0].get("formattedValue", "")
+        ingredients = content.get("ingredients", [])
+        if ingredients:
+            product.raw_materials = ingredients[0].get("formattedValue", "")
 
-            food_pairing = content.get("isGoodFor", [])
-            if food_pairing:
-                product.food_pairing = ", ".join(food["name"] for food in food_pairing)
+        food_pairing = content.get("isGoodFor", [])
+        if food_pairing:
+            product.food_pairing = ", ".join(food["name"] for food in food_pairing)
 
-            product.vmp_details_fetched = timezone.now()
-            product.save()
-            return True
+        product.vmp_details_fetched = timezone.now()
+        product.save()
+        return True
 
-        except Exception:
-            return False
-
-    def _call_api(self, url: str, product_id: int) -> dict:
+    def _call_api(
+        self, url: str, product_id: int, scraper: cloudscraper25.CloudScraper
+    ) -> dict:
         req_url = f"{url}{product_id}?fields=FULL"
-        scraper = cloudscraper25.create_scraper(interpreter="nodejs")
         return scraper.get(req_url, headers={"Accept": "application/json"}).json()
 
     def _parse_sugar_value(self, sugar_str: str) -> float:

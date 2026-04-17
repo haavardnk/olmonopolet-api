@@ -26,10 +26,15 @@ class Command(BaseCommand):
 
         self.stdout.write(f"Processing {min(calls_limit, beers.count())} beers...")
 
+        scraper = cloudscraper25.create_scraper(
+            browser="chrome",
+            enable_stealth=True,
+        )
+
         for beer in beers[:calls_limit]:
             time.sleep(1)
 
-            is_matched, match_title = self._process_beer(beer)
+            is_matched, match_title = self._process_beer(beer, scraper)
             if is_matched:
                 matched += 1
                 self.stdout.write(
@@ -49,8 +54,10 @@ class Command(BaseCommand):
 
         self.stdout.write(self.style.SUCCESS(f"Matched: {matched} Failed: {failed}"))
 
-    def _process_beer(self, beer: Beer) -> tuple[bool, str | None]:
-        result, score = self._find_beer_match(beer.vmp_name)
+    def _process_beer(
+        self, beer: Beer, scraper: cloudscraper25.CloudScraper
+    ) -> tuple[bool, str | None]:
+        result, score = self._find_beer_match(beer.vmp_name, scraper)
 
         try:
             if score and score > 40 and result:
@@ -68,14 +75,14 @@ class Command(BaseCommand):
             return False, None
 
     def _find_beer_match(
-        self, beer_name: str
+        self, beer_name: str, scraper: cloudscraper25.CloudScraper
     ) -> tuple[tuple[str, str, str] | None, int | None]:
         queries = self._generate_query_variations(beer_name)
 
         for query in queries:
             self.stdout.write(f"Trying query: {query}")
 
-            html = self._query_untappd(query)
+            html = self._query_untappd(query, scraper)
             if html:
                 results = self._parse_search_results(html)
 
@@ -112,8 +119,9 @@ class Command(BaseCommand):
 
         return variations
 
-    def _query_untappd(self, query: str) -> str | None:
-        scraper = cloudscraper25.create_scraper()
+    def _query_untappd(
+        self, query: str, scraper: cloudscraper25.CloudScraper
+    ) -> str | None:
         url = f"https://untappd.com/search?q={query}"
 
         response = scraper.get(url)

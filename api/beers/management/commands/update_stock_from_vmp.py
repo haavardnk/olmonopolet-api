@@ -38,9 +38,15 @@ class Command(BaseCommand):
         unstocked = 0
         stores_updated = 0
 
+        scraper = cloudscraper25.create_scraper(
+            interpreter="nodejs",
+            browser="chrome",
+            enable_stealth=True,
+        )
+
         for store in stores.iterator():
             store_updated, store_stocked, store_unstocked = self._update_store_stock(
-                url, store
+                scraper, url, store
             )
             updated += store_updated
             stocked += store_stocked
@@ -59,7 +65,9 @@ class Command(BaseCommand):
             )
         )
 
-    def _update_store_stock(self, url: str, store: Store) -> tuple[int, int, int]:
+    def _update_store_stock(
+        self, scraper: cloudscraper25.CloudScraper, url: str, store: Store
+    ) -> tuple[int, int, int]:
         updated = 0
         stocked = 0
         unstocked = 0
@@ -76,7 +84,7 @@ class Command(BaseCommand):
 
         for product in products:
             product_updated, product_stocked, product_beers = (
-                self._process_product_for_store(url, store, product)
+                self._process_product_for_store(scraper, url, store, product)
             )
             updated += product_updated
             stocked += product_stocked
@@ -91,45 +99,46 @@ class Command(BaseCommand):
         return updated, stocked, unstocked
 
     def _process_product_for_store(
-        self, url: str, store: Store, product: str
+        self,
+        scraper: cloudscraper25.CloudScraper,
+        url: str,
+        store: Store,
+        product: str,
     ) -> tuple[int, int, list[Beer]]:
         updated = 0
         stocked = 0
         stocked_beers: list[Beer] = []
 
-        try:
-            response, total_pages = self._call_api(url, store.store_id, 0, product)
+        response, total_pages = self._call_api(scraper, url, store.store_id, 0, product)
 
-            for page in range(total_pages):
+        for page in range(total_pages):
+            response, _ = self._call_api(scraper, url, store.store_id, page, product)
+
+            for product_data in response.get("products", []):
                 try:
-                    response, _ = self._call_api(url, store.store_id, page, product)
-
-                    for product_data in response.get("products", []):
-                        try:
-                            beer = Beer.objects.get(vmp_id=int(product_data["code"]))
-                            stocked_beers.append(beer)
-
-                            quantity = self._extract_quantity(product_data)
-                            beer_updated, beer_stocked = self._update_beer_stock(
-                                store, beer, quantity
-                            )
-
-                            updated += beer_updated
-                            stocked += beer_stocked
-
-                        except Beer.DoesNotExist:
-                            continue
-
-                except Exception:
+                    beer = Beer.objects.get(vmp_id=int(product_data["code"]))
+                except Beer.DoesNotExist:
                     continue
 
-        except Exception:
-            pass
+                stocked_beers.append(beer)
+
+                quantity = self._extract_quantity(product_data)
+                beer_updated, beer_stocked = self._update_beer_stock(
+                    store, beer, quantity
+                )
+
+                updated += beer_updated
+                stocked += beer_stocked
 
         return updated, stocked, stocked_beers
 
     def _call_api(
-        self, url: str, store_id: int, page: int, product: str
+        self,
+        scraper: cloudscraper25.CloudScraper,
+        url: str,
+        store_id: int,
+        page: int,
+        product: str,
     ) -> tuple[dict, int]:
         if "alkoholfritt" in product:
             query = (
@@ -141,11 +150,11 @@ class Command(BaseCommand):
 
         req_url = f"{url}?currentPage={page}&fields=FULL&pageSize=100&q={query}"
 
-        scraper = cloudscraper25.create_scraper(interpreter="nodejs")
         response_data = scraper.get(
             req_url, headers={"Accept": "application/json"}
         ).json()
-        total_pages = int(response_data["pagination"]["totalPages"])
+        pagination = response_data.get("pagination", {})
+        total_pages = int(pagination.get("totalPages", 0))
 
         return response_data, total_pages
 

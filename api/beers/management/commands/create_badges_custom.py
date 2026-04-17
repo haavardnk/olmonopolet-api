@@ -54,8 +54,5 @@ class Command(BaseCommand):
         if Badge.objects.filter(beer=beer, text=badge_text).exists():
             return False
 
-        try:
-            Badge.objects.create(beer=beer, text=badge_text, type=badge_type)
-            return True
-        except Exception:
-            return False
+        Badge.objects.create(beer=beer, text=badge_text, type=badge_type)
+        return True

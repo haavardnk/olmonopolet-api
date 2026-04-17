@@ -21,6 +21,12 @@ class Command(BaseCommand):
         updated = 0
         created = 0
 
+        scraper = cloudscraper25.create_scraper(
+            interpreter="nodejs",
+            browser="chrome",
+            enable_stealth=True,
+        )
+
         products = [
             "øl",
             "sider",
@@ -32,7 +38,7 @@ class Command(BaseCommand):
 
         for product in products:
             product_updated, product_created = self._process_product_category(
-                url, product
+                scraper, url, product
             )
             updated += product_updated
             created += product_created
@@ -43,39 +49,36 @@ class Command(BaseCommand):
             )
         )
 
-    def _process_product_category(self, url: str, product: str) -> tuple[int, int]:
+    def _process_product_category(
+        self, scraper: cloudscraper25.CloudScraper, url: str, product: str
+    ) -> tuple[int, int]:
         updated = 0
         created = 0
 
-        try:
-            response, total_pages = self._call_api(url, 0, product)
+        response, total_pages = self._call_api(scraper, url, 0, product)
 
-            for page in range(total_pages):
+        for page in range(total_pages):
+            if page > 0:
+                response, _ = self._call_api(scraper, url, page, product)
+
+            for beer_data in response.get("products", []):
                 try:
-                    if page > 0:
-                        response, _ = self._call_api(url, page, product)
-
-                    for beer_data in response.get("products", []):
-                        try:
-                            beer = Beer.objects.get(vmp_id=int(beer_data["code"]))
-                            self._update_existing_beer(beer, beer_data)
-                            updated += 1
-
-                        except Beer.DoesNotExist:
-                            self._create_new_beer(beer_data)
-                            created += 1
-
-                except Exception:
-                    continue
-
-        except Exception as e:
-            self.stdout.write(
-                self.style.ERROR(f"Error processing product category {product}: {e}")
-            )
+                    beer = Beer.objects.get(vmp_id=int(beer_data["code"]))
+                    self._update_existing_beer(beer, beer_data)
+                    updated += 1
+                except Beer.DoesNotExist:
+                    self._create_new_beer(beer_data)
+                    created += 1
 
         return updated, created
 
-    def _call_api(self, url: str, page: int, product: str) -> tuple[dict, int]:
+    def _call_api(
+        self,
+        scraper: cloudscraper25.CloudScraper,
+        url: str,
+        page: int,
+        product: str,
+    ) -> tuple[dict, int]:
         if "alkoholfritt" in product:
             query = f":relevance:mainCategory:alkoholfritt:mainSubCategory:{product}"
         else:
@@ -83,9 +86,9 @@ class Command(BaseCommand):
 
         req_url = f"{url}?currentPage={page}&fields=FULL&pageSize=100&q={query}"
 
-        scraper = cloudscraper25.create_scraper(interpreter="nodejs")
         response = scraper.get(req_url, headers={"Accept": "application/json"}).json()
-        total_pages = int(response["pagination"]["totalPages"])
+        pagination = response.get("pagination", {})
+        total_pages = int(pagination.get("totalPages", 0))
 
         return response, total_pages
 
