@@ -16,6 +16,8 @@ from beers.api.serializers import (
     StockChangeSerializer,
     StockSerializer,
     StoreSerializer,
+    UntappdListSearchResultSerializer,
+    UntappdListSubscribeSerializer,
     UntappdRssFeedSerializer,
     UserListCreateSerializer,
     UserListItemCreateSerializer,
@@ -31,16 +33,19 @@ from beers.models import (
     Release,
     Stock,
     Store,
+    UntappdList,
     UntappdRssFeed,
     UserList,
     UserListItem,
     WrongMatch,
 )
+from beers.untappd_lists import fetch_user_lists
 from django.contrib.postgres.aggregates import ArrayAgg
 from django.db import models
 from django.db.models import Count, F, Q, QuerySet
 from django.db.models.functions import Greatest
 from django_filters.rest_framework import DjangoFilterBackend
+from django_q.tasks import async_task
 from rest_framework import filters, permissions
 from rest_framework.decorators import action
 from rest_framework.renderers import BrowsableAPIRenderer
@@ -246,11 +251,30 @@ class UserListViewSet(BrowsableMixin, ModelViewSet):
             return UserListUpdateSerializer
         return UserListSerializer
 
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        if self.action == "retrieve":
+            context["include_items"] = True
+        return context
+
     def get_queryset(self) -> QuerySet[UserList]:
-        return UserList.objects.filter(user=self.request.user).prefetch_related("items")
+        return (
+            UserList.objects.filter(user=self.request.user)
+            .select_related("untappd_list")
+            .prefetch_related("items")
+        )
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
+
+    def perform_destroy(self, instance: UserList) -> None:
+        untappd_list = instance.untappd_list
+        instance.delete()
+        if (
+            untappd_list
+            and not UserList.objects.filter(untappd_list=untappd_list).exists()
+        ):
+            untappd_list.delete()
 
     @action(detail=True, methods=["get"], url_path="share")
     def share(self, request, pk=None):
@@ -269,13 +293,15 @@ class UserListViewSet(BrowsableMixin, ModelViewSet):
     @action(detail=True, methods=["post"], url_path="items")
     def add_item(self, request, pk=None):
         user_list = self.get_object()
+        if user_list.list_type == UserList.ListType.UNTAPPD:
+            return Response(
+                {"detail": "Cannot modify items on an Untappd list"}, status=403
+            )
         serializer = UserListItemCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         max_order = user_list.items.aggregate(m=models.Max("sort_order"))["m"] or 0
         serializer.save(list=user_list, sort_order=max_order + 1)
-        return Response(
-            UserListItemSerializer(serializer.instance).data, status=201
-        )
+        return Response(UserListItemSerializer(serializer.instance).data, status=201)
 
     @action(
         detail=True,
@@ -284,6 +310,10 @@ class UserListViewSet(BrowsableMixin, ModelViewSet):
     )
     def item_detail(self, request, pk=None, item_pk: str | None = None):
         user_list = self.get_object()
+        if user_list.list_type == UserList.ListType.UNTAPPD:
+            return Response(
+                {"detail": "Cannot modify items on an Untappd list"}, status=403
+            )
         item = user_list.items.filter(pk=item_pk).first()
         if not item:
             return Response(status=404)
@@ -295,7 +325,24 @@ class UserListViewSet(BrowsableMixin, ModelViewSet):
         serializer.save()
         return Response(UserListItemSerializer(serializer.instance).data)
 
-    @action(detail=False, methods=["post"], url_path="reorder")
+    @action(
+        detail=True,
+        methods=["delete"],
+        url_path="products/(?P<product_id>[^/.]+)",
+    )
+    def product_detail(self, request, pk=None, product_id=None):
+        user_list = self.get_object()
+        if user_list.list_type == UserList.ListType.UNTAPPD:
+            return Response(
+                {"detail": "Cannot modify items on an Untappd list"}, status=403
+            )
+        item = user_list.items.filter(product_id=product_id).first()
+        if not item:
+            return Response(status=404)
+        item.delete()
+        return Response(status=204)
+
+    @action(detail=False, methods=["post", "patch"], url_path="reorder")
     def reorder_lists(self, request):
         serializer = ListReorderSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -307,12 +354,99 @@ class UserListViewSet(BrowsableMixin, ModelViewSet):
     @action(detail=True, methods=["post"], url_path="items/reorder")
     def reorder_items(self, request, pk=None):
         user_list = self.get_object()
+        if user_list.list_type == UserList.ListType.UNTAPPD:
+            return Response(
+                {"detail": "Cannot modify items on an Untappd list"}, status=403
+            )
         serializer = ItemReorderSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         item_ids: list[int] = serializer.validated_data["item_ids"]
         for i, item_id in enumerate(item_ids):
             UserListItem.objects.filter(pk=item_id, list=user_list).update(sort_order=i)
         return Response(status=204)
+
+
+class UntappdListViewSet(BrowsableMixin, ModelViewSet):
+    queryset = UntappdList.objects.all()
+    permission_classes = [permissions.IsAuthenticated]
+    pagination_class = None
+    http_method_names = ["get", "post"]
+    lookup_field = "untappd_list_id"
+
+    def list(self, request):
+        return Response(status=405)
+
+    @action(detail=False, methods=["get"], url_path="search")
+    def search(self, request):
+        username = request.query_params.get("username", "").strip()
+        if not username:
+            return Response({"detail": "username parameter is required"}, status=400)
+
+        try:
+            lists = fetch_user_lists(username)
+        except ValueError as e:
+            return Response({"detail": str(e)}, status=404)
+        except Exception:
+            return Response(
+                {"detail": "Failed to fetch lists from Untappd"}, status=502
+            )
+
+        serializer = UntappdListSearchResultSerializer(lists, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=["post"], url_path="subscribe")
+    def subscribe(self, request):
+        serializer = UntappdListSubscribeSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        untappd_list, _created = UntappdList.objects.get_or_create(
+            untappd_list_id=data["untappd_list_id"],
+            untappd_username=data["untappd_username"],
+            defaults={
+                "name": data["name"],
+                "is_wishlist": data["untappd_list_id"] == 0,
+            },
+        )
+
+        existing = UserList.objects.filter(
+            user=request.user, untappd_list=untappd_list
+        ).first()
+        if existing:
+            return Response(UserListSerializer(existing).data, status=200)
+
+        user_list = UserList.objects.create(
+            user=request.user,
+            name=data["name"],
+            list_type=UserList.ListType.UNTAPPD,
+            untappd_list=untappd_list,
+        )
+
+        task_id = async_task(
+            "beers.tasks.sync_untappd_list_task",
+            untappd_list.pk,
+        )
+        untappd_list.sync_task_id = task_id
+        untappd_list.save(update_fields=["sync_task_id"])
+
+        return Response(UserListSerializer(user_list).data, status=201)
+
+    @action(detail=True, methods=["post"], url_path="sync")
+    def sync(self, request, untappd_list_id=None):
+        user_list = UserList.objects.filter(
+            user=request.user, untappd_list__untappd_list_id=untappd_list_id
+        ).select_related("untappd_list").first()
+        if not user_list or not user_list.untappd_list:
+            return Response(status=404)
+
+        task_id = async_task(
+            "beers.tasks.sync_untappd_list_task",
+            user_list.untappd_list.pk,
+        )
+        user_list.untappd_list.sync_task_id = task_id
+        user_list.untappd_list.save(update_fields=["sync_task_id"])
+
+        return Response(UserListSerializer(user_list).data, status=202)
 
 
 class UntappdRssFeedViewSet(BrowsableMixin, ModelViewSet):

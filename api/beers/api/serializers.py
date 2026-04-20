@@ -18,6 +18,7 @@ from beers.models import (
 )
 from django.contrib.auth.models import User
 from django.db import models
+from django_q.models import OrmQ, Task
 from drf_dynamic_fields import DynamicFieldsMixin
 from rest_framework import serializers
 
@@ -306,6 +307,17 @@ class UserListSerializer(serializers.ModelSerializer):
     stats = serializers.SerializerMethodField()
     items = serializers.SerializerMethodField()
     total_price = serializers.SerializerMethodField()
+    untappd_list_id = serializers.IntegerField(
+        source="untappd_list.untappd_list_id", read_only=True, default=None
+    )
+    untappd_username = serializers.CharField(
+        source="untappd_list.untappd_username", read_only=True, default=None
+    )
+    is_read_only = serializers.SerializerMethodField()
+    last_synced = serializers.DateTimeField(
+        source="untappd_list.last_synced", read_only=True, default=None
+    )
+    sync_status = serializers.SerializerMethodField()
 
     class Meta:
         model = UserList
@@ -326,6 +338,11 @@ class UserListSerializer(serializers.ModelSerializer):
             "stats",
             "items",
             "total_price",
+            "untappd_list_id",
+            "untappd_username",
+            "is_read_only",
+            "last_synced",
+            "sync_status",
         ]
         read_only_fields = [
             "id",
@@ -338,12 +355,58 @@ class UserListSerializer(serializers.ModelSerializer):
             "stats",
             "items",
             "total_price",
+            "untappd_list_id",
+            "untappd_username",
+            "is_read_only",
+            "last_synced",
+            "sync_status",
         ]
 
+    def get_sync_status(self, obj: UserList) -> str | None:
+        if obj.list_type != UserList.ListType.UNTAPPD or not obj.untappd_list:
+            return None
+        task_id = obj.untappd_list.sync_task_id
+        if not task_id:
+            return None
+        task = Task.objects.filter(id=task_id).first()
+        if task:
+            return "failed" if not task.success else "success"
+        if OrmQ.objects.filter(key=task_id).exists():
+            return "queued"
+        return "running"
+
+    def _untappd_product_ids(self, obj) -> list[str] | None:
+        if obj.list_type != UserList.ListType.UNTAPPD or not obj.untappd_list:
+            return None
+        beer_ids = obj.untappd_list.untappd_beer_ids or []
+        if not beer_ids:
+            return []
+        matched = dict(
+            Beer.objects.filter(untpd_id__in=beer_ids).values_list(
+                "untpd_id", "vmp_id"
+            )
+        )
+        seen: set[str] = set()
+        result: list[str] = []
+        for bid in beer_ids:
+            vmp_id = matched.get(bid)
+            if vmp_id is not None:
+                pid = str(vmp_id)
+                if pid not in seen:
+                    seen.add(pid)
+                    result.append(pid)
+        return result
+
     def get_item_count(self, obj):
+        untappd_ids = self._untappd_product_ids(obj)
+        if untappd_ids is not None:
+            return len(untappd_ids)
         return obj.items.aggregate(total=models.Sum("quantity"))["total"] or 0
 
     def get_product_ids(self, obj):
+        untappd_ids = self._untappd_product_ids(obj)
+        if untappd_ids is not None:
+            return untappd_ids
         return list(obj.items.values_list("product_id", flat=True))
 
     def get_is_past(self, obj):
@@ -406,6 +469,9 @@ class UserListSerializer(serializers.ModelSerializer):
         )
         return round(total, 2)
 
+    def get_is_read_only(self, obj) -> bool:
+        return obj.list_type == UserList.ListType.UNTAPPD
+
     def to_representation(self, instance):
         data = super().to_representation(instance)
         if data.get("is_past") is None:
@@ -416,6 +482,10 @@ class UserListSerializer(serializers.ModelSerializer):
             data.pop("items", None)
         if data.get("total_price") is None:
             data.pop("total_price", None)
+        if data.get("untappd_list_id") is None:
+            data.pop("untappd_list_id", None)
+            data.pop("untappd_username", None)
+            data.pop("last_synced", None)
         return data
 
 
@@ -457,11 +527,23 @@ class UserListUpdateSerializer(serializers.ModelSerializer):
 
 class SharedUserListSerializer(serializers.ModelSerializer):
     items = serializers.SerializerMethodField()
+    item_count = serializers.SerializerMethodField()
+    product_ids = serializers.SerializerMethodField()
     user_name = serializers.SerializerMethodField()
     store_name = serializers.SerializerMethodField()
     is_past = serializers.SerializerMethodField()
     stats = serializers.SerializerMethodField()
     total_price = serializers.SerializerMethodField()
+    untappd_list_id = serializers.IntegerField(
+        source="untappd_list.untappd_list_id", read_only=True, default=None
+    )
+    untappd_username = serializers.CharField(
+        source="untappd_list.untappd_username", read_only=True, default=None
+    )
+    is_read_only = serializers.SerializerMethodField()
+    last_synced = serializers.DateTimeField(
+        source="untappd_list.last_synced", read_only=True, default=None
+    )
 
     class Meta:
         model = UserList
@@ -478,11 +560,51 @@ class SharedUserListSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
             "user_name",
+            "item_count",
+            "product_ids",
             "is_past",
             "stats",
             "items",
             "total_price",
+            "untappd_list_id",
+            "untappd_username",
+            "is_read_only",
+            "last_synced",
         ]
+
+    def _untappd_product_ids(self, obj) -> list[str] | None:
+        if obj.list_type != UserList.ListType.UNTAPPD or not obj.untappd_list:
+            return None
+        beer_ids = obj.untappd_list.untappd_beer_ids or []
+        if not beer_ids:
+            return []
+        matched = dict(
+            Beer.objects.filter(untpd_id__in=beer_ids).values_list(
+                "untpd_id", "vmp_id"
+            )
+        )
+        seen: set[str] = set()
+        result: list[str] = []
+        for bid in beer_ids:
+            vmp_id = matched.get(bid)
+            if vmp_id is not None:
+                pid = str(vmp_id)
+                if pid not in seen:
+                    seen.add(pid)
+                    result.append(pid)
+        return result
+
+    def get_item_count(self, obj):
+        untappd_ids = self._untappd_product_ids(obj)
+        if untappd_ids is not None:
+            return len(untappd_ids)
+        return obj.items.aggregate(total=models.Sum("quantity"))["total"] or 0
+
+    def get_product_ids(self, obj):
+        untappd_ids = self._untappd_product_ids(obj)
+        if untappd_ids is not None:
+            return untappd_ids
+        return list(obj.items.values_list("product_id", flat=True))
 
     def get_items(self, obj):
         items = obj.items.all()
@@ -553,6 +675,9 @@ class SharedUserListSerializer(serializers.ModelSerializer):
         )
         return round(total, 2)
 
+    def get_is_read_only(self, obj) -> bool:
+        return obj.list_type == UserList.ListType.UNTAPPD
+
     def to_representation(self, instance):
         data = super().to_representation(instance)
         if data.get("is_past") is None:
@@ -561,7 +686,23 @@ class SharedUserListSerializer(serializers.ModelSerializer):
             data.pop("stats", None)
         if data.get("total_price") is None:
             data.pop("total_price", None)
+        if data.get("untappd_list_id") is None:
+            data.pop("untappd_list_id", None)
+            data.pop("untappd_username", None)
+            data.pop("last_synced", None)
         return data
+
+
+class UntappdListSearchResultSerializer(serializers.Serializer):
+    list_id = serializers.IntegerField()
+    name = serializers.CharField()
+    item_count = serializers.IntegerField()
+
+
+class UntappdListSubscribeSerializer(serializers.Serializer):
+    untappd_list_id = serializers.IntegerField()
+    untappd_username = serializers.CharField(max_length=100)
+    name = serializers.CharField(max_length=200)
 
 
 class ListReorderSerializer(serializers.Serializer):

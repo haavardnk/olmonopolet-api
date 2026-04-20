@@ -10,6 +10,7 @@ from django.db.models.deletion import CASCADE
 class Option(models.Model):
     name = models.CharField(max_length=50, primary_key=True)
     active = models.BooleanField()
+    value = models.TextField(blank=True, default="")
 
     def __str__(self):
         return self.name
@@ -282,12 +283,37 @@ class Tasted(models.Model):
         return f"{self.user.username} - {self.beer.vmp_name}"
 
 
+class UntappdList(models.Model):
+    untappd_list_id = models.IntegerField()
+    untappd_username = models.CharField(max_length=100)
+    name = models.CharField(max_length=200)
+    item_count = models.IntegerField(default=0)
+    untappd_beer_ids = models.JSONField(default=list)
+    last_synced = models.DateTimeField(blank=True, null=True)
+    sync_task_id = models.CharField(max_length=64, blank=True, default="")
+    active = models.BooleanField(default=True)
+    is_wishlist = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["untappd_username", "untappd_list_id"],
+                name="unique_untappd_list",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.untappd_username} - {self.name}"
+
+
 class UserList(models.Model):
     class ListType(models.TextChoices):
         STANDARD = "standard", "Standard"
         SHOPPING = "shopping", "Shopping"
         CELLAR = "cellar", "Cellar"
         EVENT = "event", "Event"
+        UNTAPPD = "untappd", "Untappd"
 
     user = models.ForeignKey("auth.User", on_delete=CASCADE, related_name="lists")
     name = models.CharField(max_length=100)
@@ -297,6 +323,13 @@ class UserList(models.Model):
     )
     selected_store_id = models.IntegerField(blank=True, null=True)
     event_date = models.DateField(blank=True, null=True)
+    untappd_list = models.ForeignKey(
+        UntappdList,
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name="user_lists",
+    )
     sort_order = models.PositiveIntegerField(default=0)
     share_token = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
     created_at = models.DateTimeField(auto_now_add=True)

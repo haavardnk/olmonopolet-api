@@ -109,8 +109,23 @@ def sync_tasted() -> str:
     return _call_command_with_output("sync_tasted")
 
 
+def sync_untappd_list_task(untappd_list_pk: int) -> int:
+    from beers.models import UntappdList
+    from beers.untappd_lists import sync_untappd_list
+
+    untappd_list = UntappdList.objects.get(pk=untappd_list_pk)
+    return sync_untappd_list(untappd_list)
+
+
 def sync_rss_feeds(user: str | None = None) -> str:
     kwargs = {}
     if user:
         kwargs["user"] = user
     return _call_command_with_output("sync_rss_feeds", **kwargs)
+
+
+def sync_untappd_lists(list_id: int | None = None) -> str:
+    kwargs = {}
+    if list_id:
+        kwargs["list_id"] = list_id
+    return _call_command_with_output("sync_untappd_lists", **kwargs)

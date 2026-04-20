@@ -2,15 +2,15 @@ from __future__ import annotations
 
 from beers.models import Beer, Stock, Tasted
 from django.db.models import Exists, F, OuterRef, Q, QuerySet
-from django.http import HttpRequest
 from django_filters import rest_framework as flt
 from rest_framework import filters
+from rest_framework.request import Request
 from rest_framework.views import APIView
 
 
 class NullsAlwaysLastOrderingFilter(filters.OrderingFilter):
-    def filter_queryset(
-        self, request: HttpRequest, queryset: QuerySet[Beer], view: APIView
+    def filter_queryset(  # type: ignore[override]
+        self, request: Request, queryset: QuerySet[Beer], view: APIView
     ) -> QuerySet[Beer]:
         ordering = self.get_ordering(request, queryset, view)
 

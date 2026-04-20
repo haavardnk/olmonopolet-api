@@ -1,5 +1,12 @@
 from __future__ import annotations
 
+from django.contrib import admin
+from django.contrib.auth.admin import UserAdmin
+from django.contrib.auth.models import User
+from django.db import models
+from django.db.models import Count, QuerySet
+from django.http import HttpRequest
+
 from beers.models import (
     Badge,
     Beer,
@@ -11,18 +18,13 @@ from beers.models import (
     Store,
     Tasted,
     UntappdCheckin,
+    UntappdList,
     UntappdRssFeed,
     UserList,
     UserListItem,
     VmpNotReleased,
     WrongMatch,
 )
-from django.contrib import admin
-from django.contrib.auth.admin import UserAdmin
-from django.contrib.auth.models import User
-from django.db import models
-from django.db.models import Count, QuerySet
-from django.http import HttpRequest
 
 
 class MatchManually(Beer):
@@ -163,14 +165,13 @@ class UserListItemInline(admin.TabularInline):
     readonly_fields = ("beer_name", "created_at")
     ordering = ("sort_order",)
 
+    @admin.display(description="Beer")
     def beer_name(self, obj):
         try:
             beer = Beer.objects.get(vmp_id=obj.product_id)
             return beer.vmp_name
         except Beer.DoesNotExist:
             return f"Unknown ({obj.product_id})"
-
-    beer_name.short_description = "Beer"
 
 
 class UserListInline(admin.TabularInline):
@@ -180,10 +181,9 @@ class UserListInline(admin.TabularInline):
     readonly_fields = ("share_token", "item_count")
     show_change_link = True
 
+    @admin.display(description="Items")
     def item_count(self, obj):
         return obj.items.count()
-
-    item_count.short_description = "Items"
 
 
 class UserListAdmin(admin.ModelAdmin):
@@ -212,10 +212,9 @@ class UserListAdmin(admin.ModelAdmin):
     readonly_fields = ("user", "share_token", "created_at", "updated_at")
     inlines = [UserListItemInline]
 
+    @admin.display(description="Items")
     def item_count(self, obj):
         return obj.items.count()
-
-    item_count.short_description = "Items"
 
 
 admin.site.register(UserList, UserListAdmin)
@@ -254,7 +253,13 @@ class UntappdCheckinInline(admin.TabularInline):
     extra = 0
     max_num = 50
     fields = ("untpd_checkin_id", "untpd_beer_id", "rating", "checkin_at", "synced")
-    readonly_fields = ("untpd_checkin_id", "untpd_beer_id", "rating", "checkin_at", "synced")
+    readonly_fields = (
+        "untpd_checkin_id",
+        "untpd_beer_id",
+        "rating",
+        "checkin_at",
+        "synced",
+    )
     ordering = ("-checkin_at",)
 
     def get_queryset(self, request):
@@ -311,5 +316,6 @@ class UntappdRssFeedAdmin(admin.ModelAdmin):
 admin.site.register(Badge)
 admin.site.register(ExternalAPI)
 admin.site.register(Option)
+admin.site.register(UntappdList)
 admin.site.register(VmpNotReleased)
 admin.site.register(WrongMatch)
