@@ -113,8 +113,10 @@ class Beer(DirtyFieldsMixin, models.Model):
             and self.price_per_volume > 0
         ):
             return (
-                (self.rating**4.8) / ((self.price_per_volume / 100) ** 0.32)
-            ) * 0.0176
+                ((self.rating - 1.5) / 3.3) ** 3
+                * 28
+                / (self.price_per_volume / 250) ** 0.30
+            )
         return None
 
     def __str__(self):

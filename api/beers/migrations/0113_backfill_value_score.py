@@ -11,8 +11,10 @@ def backfill_value_score(apps, schema_editor):
         price_per_volume__isnull=False, price_per_volume__gt=0,
     ).iterator(chunk_size=2000):
         beer.value_score = (
-            (beer.rating**4.8) / ((beer.price_per_volume / 100) ** 0.32)
-        ) * 0.0176
+            ((beer.rating - 1.5) / 3.3) ** 3
+            * 28
+            / (beer.price_per_volume / 250) ** 0.30
+        )
         beers_to_update.append(beer)
         if len(beers_to_update) >= 2000:
             Beer.objects.bulk_update(beers_to_update, ["value_score"])

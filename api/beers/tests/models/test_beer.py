@@ -7,7 +7,7 @@ from beers.tests.factories import BeerFactory
 class TestValueScore:
     def test_normal_values(self) -> None:
         beer = BeerFactory.build(rating=4.0, price_per_volume=300.0)
-        expected = (4.0**4.8) / ((300.0 / 100) ** 0.32) * 0.0176
+        expected = ((4.0 - 1.5) / 3.3) ** 3 * 28 / (300.0 / 250) ** 0.30
         assert beer._compute_value_score() == pytest.approx(expected)
 
     def test_rating_zero_returns_none(self) -> None:
@@ -28,7 +28,7 @@ class TestValueScore:
 
     def test_high_rating_low_ppv(self) -> None:
         beer = BeerFactory.build(rating=4.5, price_per_volume=100.0)
-        expected = (4.5**4.8) / ((100.0 / 100) ** 0.32) * 0.0176
+        expected = ((4.5 - 1.5) / 3.3) ** 3 * 28 / (100.0 / 250) ** 0.30
         assert beer._compute_value_score() == pytest.approx(expected)
 
 
