@@ -33,6 +33,7 @@ from beers.models import (
     Release,
     Stock,
     Store,
+    Tasted,
     UntappdList,
     UntappdRssFeed,
     UserList,
@@ -42,7 +43,7 @@ from beers.models import (
 from beers.untappd_lists import fetch_user_lists
 from django.contrib.postgres.aggregates import ArrayAgg
 from django.db import models
-from django.db.models import Count, F, Q, QuerySet
+from django.db.models import Count, Exists, F, OuterRef, Q, QuerySet, Value
 from django.db.models.functions import Greatest
 from django_filters.rest_framework import DjangoFilterBackend
 from django_q.tasks import async_task
@@ -97,6 +98,17 @@ class BeerViewSet(BrowsableMixin, ModelViewSet):
     def get_queryset(self) -> QuerySet[Beer]:
         queryset = Beer.objects.all()
         queryset = queryset.prefetch_related("badge_set", "stock_set")
+
+        if self.request.user and self.request.user.is_authenticated:
+            queryset = queryset.annotate(
+                user_tasted=Exists(
+                    Tasted.objects.filter(
+                        user=self.request.user, beer=OuterRef("pk")
+                    )
+                )
+            )
+        else:
+            queryset = queryset.annotate(user_tasted=Value(False))
 
         beers = getattr(self.request, "query_params", {}).get("beers")
         if beers is not None:
