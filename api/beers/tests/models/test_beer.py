@@ -8,28 +8,28 @@ class TestValueScore:
     def test_normal_values(self) -> None:
         beer = BeerFactory.build(rating=4.0, price_per_volume=300.0)
         expected = (4.0**4.8) / ((300.0 / 100) ** 0.32) * 0.0176
-        assert beer.value_score == pytest.approx(expected)
+        assert beer._compute_value_score() == pytest.approx(expected)
 
     def test_rating_zero_returns_none(self) -> None:
         beer = BeerFactory.build(rating=0, price_per_volume=300.0)
-        assert beer.value_score is None
+        assert beer._compute_value_score() is None
 
     def test_null_rating_returns_none(self) -> None:
         beer = BeerFactory.build(rating=None, price_per_volume=300.0)
-        assert beer.value_score is None
+        assert beer._compute_value_score() is None
 
     def test_null_ppv_returns_none(self) -> None:
         beer = BeerFactory.build(rating=4.0, price_per_volume=None)
-        assert beer.value_score is None
+        assert beer._compute_value_score() is None
 
     def test_both_null_returns_none(self) -> None:
         beer = BeerFactory.build(rating=None, price_per_volume=None)
-        assert beer.value_score is None
+        assert beer._compute_value_score() is None
 
     def test_high_rating_low_ppv(self) -> None:
         beer = BeerFactory.build(rating=4.5, price_per_volume=100.0)
         expected = (4.5**4.8) / ((100.0 / 100) ** 0.32) * 0.0176
-        assert beer.value_score == pytest.approx(expected)
+        assert beer._compute_value_score() == pytest.approx(expected)
 
 
 @pytest.mark.django_db

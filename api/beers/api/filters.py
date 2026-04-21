@@ -42,6 +42,8 @@ class BeerFilter(flt.FilterSet):
     main_category = flt.CharFilter(method="custom_main_category_filter")
     price_high = flt.NumberFilter(field_name="price", lookup_expr="lte")
     price_low = flt.NumberFilter(field_name="price", lookup_expr="gte")
+    value_score_high = flt.NumberFilter(field_name="value_score", lookup_expr="lte")
+    value_score_low = flt.NumberFilter(field_name="value_score", lookup_expr="gte")
     ppv_high = flt.NumberFilter(field_name="price_per_volume", lookup_expr="lte")
     ppv_low = flt.NumberFilter(field_name="price_per_volume", lookup_expr="gte")
     abv_high = flt.NumberFilter(field_name="abv", lookup_expr="lte")
@@ -142,6 +144,8 @@ class BeerFilter(flt.FilterSet):
             "is_christmas_beer",
             "main_category",
             "user_tasted",
+            "value_score_high",
+            "value_score_low",
         ]
 
 

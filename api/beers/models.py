@@ -92,6 +92,7 @@ class Beer(DirtyFieldsMixin, models.Model):
     # Calculated info
     alcohol_units = models.FloatField(blank=True, null=True)
     price_per_alcohol_unit = models.FloatField(blank=True, null=True)
+    value_score = models.FloatField(blank=True, null=True)
 
     # Classification
     is_christmas_beer = models.BooleanField(default=False)
@@ -104,8 +105,7 @@ class Beer(DirtyFieldsMixin, models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     active = models.BooleanField(default=True)
 
-    @property
-    def value_score(self) -> float | None:
+    def _compute_value_score(self) -> float | None:
         if (
             self.rating
             and self.rating > 0
@@ -121,6 +121,7 @@ class Beer(DirtyFieldsMixin, models.Model):
         return self.vmp_name
 
     def save(self, *args, **kwargs):
+        self.value_score = self._compute_value_score()
         try:
             dirty_fields = self.get_dirty_fields()
             if (
@@ -384,7 +385,10 @@ class UntappdCheckin(models.Model):
 
 class UntappdRssFeed(models.Model):
     user = models.OneToOneField(
-        "auth.User", on_delete=CASCADE, related_name="untappd_rss_feed", primary_key=True
+        "auth.User",
+        on_delete=CASCADE,
+        related_name="untappd_rss_feed",
+        primary_key=True,
     )
     feed_url = models.URLField(max_length=500)
     last_synced = models.DateTimeField(blank=True, null=True)

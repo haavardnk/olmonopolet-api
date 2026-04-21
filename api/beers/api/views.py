@@ -88,6 +88,7 @@ class BeerViewSet(BrowsableMixin, ModelViewSet):
         "abv",
         "price_per_volume",
         "price_per_alcohol_unit",
+        "value_score",
         "checkin__rating",
         "tasted__rating",
     ]
