@@ -319,7 +319,7 @@ class UserListViewSet(BrowsableMixin, ModelViewSet):
     @action(
         detail=True,
         methods=["patch", "delete"],
-        url_path="items/(?P<item_pk>[^/.]+)",
+        url_path=r"items/(?P<item_pk>\d+)",
     )
     def item_detail(self, request, pk=None, item_pk: str | None = None):
         user_list = self.get_object()
@@ -364,7 +364,7 @@ class UserListViewSet(BrowsableMixin, ModelViewSet):
             UserList.objects.filter(pk=list_id, user=request.user).update(sort_order=i)
         return Response(status=204)
 
-    @action(detail=True, methods=["post"], url_path="items/reorder")
+    @action(detail=True, methods=["post", "patch"], url_path="items/reorder")
     def reorder_items(self, request, pk=None):
         user_list = self.get_object()
         if user_list.list_type == UserList.ListType.UNTAPPD:
