@@ -295,7 +295,12 @@ class UserListViewSet(BrowsableMixin, ModelViewSet):
         serializer = SharedUserListSerializer(user_list)
         return Response(serializer.data)
 
-    @action(detail=False, methods=["get"], url_path="shared/(?P<token>[^/.]+)")
+    @action(
+        detail=False,
+        methods=["get"],
+        url_path="shared/(?P<token>[^/.]+)",
+        permission_classes=[permissions.AllowAny],
+    )
     def shared(self, request, token: str | None = None):
         user_list = UserList.objects.filter(share_token=token).first()
         if not user_list:
