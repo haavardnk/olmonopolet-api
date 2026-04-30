@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json as _json
+
 from beers.api.filters import (
     BeerFilter,
     NullsAlwaysLastOrderingFilter,
@@ -102,9 +104,7 @@ class BeerViewSet(BrowsableMixin, ModelViewSet):
         if self.request.user and self.request.user.is_authenticated:
             queryset = queryset.annotate(
                 user_tasted=Exists(
-                    Tasted.objects.filter(
-                        user=self.request.user, beer=OuterRef("pk")
-                    )
+                    Tasted.objects.filter(user=self.request.user, beer=OuterRef("pk"))
                 )
             )
         else:
@@ -446,9 +446,13 @@ class UntappdListViewSet(BrowsableMixin, ModelViewSet):
 
     @action(detail=True, methods=["post"], url_path="sync")
     def sync(self, request, untappd_list_id=None):
-        user_list = UserList.objects.filter(
-            user=request.user, untappd_list__untappd_list_id=untappd_list_id
-        ).select_related("untappd_list").first()
+        user_list = (
+            UserList.objects.filter(
+                user=request.user, untappd_list__untappd_list_id=untappd_list_id
+            )
+            .select_related("untappd_list")
+            .first()
+        )
         if not user_list or not user_list.untappd_list:
             return Response(status=404)
 
@@ -466,9 +470,56 @@ class UntappdRssFeedViewSet(BrowsableMixin, ModelViewSet):
     serializer_class = UntappdRssFeedSerializer
     permission_classes = [permissions.IsAuthenticated]
     pagination_class = None
+    http_method_names = ["get", "post", "put", "patch", "delete"]
 
     def get_queryset(self) -> QuerySet[UntappdRssFeed]:
         return UntappdRssFeed.objects.filter(user=self.request.user)
 
-    def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
+    def list(self, request, *args, **kwargs):
+        feed = self.get_queryset().first()
+        if not feed:
+            return Response(status=404)
+        return Response(self.get_serializer(feed).data)
+
+    @action(detail=False, methods=["get", "put", "patch", "delete"])
+    def me(self, request):
+        feed = UntappdRssFeed.objects.filter(user=request.user).first()
+        if request.method == "GET":
+            if not feed:
+                return Response(status=404)
+            return Response(self.get_serializer(feed).data)
+        if request.method == "DELETE":
+            if feed:
+                feed.delete()
+            return Response(status=204)
+        if not feed:
+            serializer = self.get_serializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            serializer.save(user=request.user)
+            return Response(serializer.data, status=201)
+        serializer = self.get_serializer(
+            feed, data=request.data, partial=request.method == "PATCH"
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
+
+    @action(detail=False, methods=["post"])
+    def sync(self, request):
+        from beers.tasks import sync_rss_feeds
+
+        feed = UntappdRssFeed.objects.filter(user=request.user, active=True).first()
+        if not feed:
+            return Response({"error": "No active RSS feed configured"}, status=404)
+        try:
+            output = sync_rss_feeds(user=request.user.username)
+        except Exception as e:
+            return Response({"error": str(e)}, status=500)
+        for line in reversed(output.strip().splitlines()):
+            try:
+                summary = _json.loads(line)
+            except (ValueError, TypeError):
+                continue
+            summary.pop("users_affected", None)
+            return Response(summary)
+        return Response({"imported": 0, "synced": 0})
