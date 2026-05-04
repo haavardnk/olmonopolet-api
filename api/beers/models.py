@@ -211,16 +211,20 @@ class WrongMatch(models.Model):
     def __str__(self):
         return self.beer.vmp_name
 
+    def _resolve_suggested_url(self) -> str:
+        if "https://untp.beer/" in self.suggested_url:
+            try:
+                response = requests.head(self.suggested_url, timeout=5)
+                return response.headers.get("location", self.suggested_url)
+            except Exception:
+                logger.warning("Failed to resolve short URL: %s", self.suggested_url)
+                return self.suggested_url
+        return self.suggested_url
+
     def save(self, *args, **kwargs):
         super(WrongMatch, self).save(*args, **kwargs)
 
-        if "https://untp.beer/" in self.suggested_url:
-            try:
-                suggested_url = requests.head(self.suggested_url).headers["location"]
-            except Exception:
-                suggested_url = self.suggested_url
-        else:
-            suggested_url = self.suggested_url
+        suggested_url = self._resolve_suggested_url()
 
         try:
             auto_accept = Option.objects.get(name="auto_accept_wrong_match").active
