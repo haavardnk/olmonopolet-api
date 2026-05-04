@@ -47,6 +47,8 @@ from django.contrib.postgres.aggregates import ArrayAgg
 from django.db import models
 from django.db.models import Count, Exists, F, OuterRef, Q, QuerySet, Value
 from django.db.models.functions import Greatest
+from django.utils.decorators import method_decorator
+from django.views.decorators.cache import cache_page
 from django_filters.rest_framework import DjangoFilterBackend
 from django_q.tasks import async_task
 from rest_framework import filters, permissions
@@ -179,17 +181,16 @@ class WrongMatchViewSet(BrowsableMixin, ModelViewSet):
     permission_classes = [permissions.AllowAny]
 
 
+@method_decorator(cache_page(60 * 5), name="dispatch")
 class ReleaseViewSet(BrowsableMixin, ModelViewSet):
     serializer_class = ReleaseSerializer
     pagination_class = Pagination
     permission_classes = [permissions.AllowAny]
 
     def get_queryset(self) -> QuerySet[Release]:
-        return (
-            Release.objects.filter(active=True)
-            .order_by("-release_date")
-            .prefetch_related("beer")
-            .annotate(
+        qs = Release.objects.filter(active=True).order_by("-release_date")
+        if self.action in ("list", "retrieve"):
+            qs = qs.annotate(
                 product_count=Count("beer", distinct=True),
                 beer_count=Count(
                     "beer", filter=Q(beer__main_category__iexact="Øl"), distinct=True
@@ -202,7 +203,7 @@ class ReleaseViewSet(BrowsableMixin, ModelViewSet):
                 ),
                 product_selections=ArrayAgg("beer__product_selection", distinct=True),
             )
-        )
+        return qs
 
     @action(detail=True, methods=["get"], url_path="countries")
     def countries(self, request, pk=None):
