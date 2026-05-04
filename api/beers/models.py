@@ -1,3 +1,4 @@
+import logging
 import uuid
 
 import requests
@@ -5,6 +6,8 @@ from dirtyfields import DirtyFieldsMixin
 from django.core.validators import MaxValueValidator, MinValueValidator, URLValidator
 from django.db import models
 from django.db.models.deletion import CASCADE
+
+logger = logging.getLogger(__name__)
 
 
 class Option(models.Model):
@@ -136,7 +139,6 @@ class Beer(DirtyFieldsMixin, models.Model):
                 self.prioritize_recheck = True
                 self.verified_match = True
                 self.match_manually = False
-                self.save()
 
             if (
                 "match_manually" in dirty_fields
@@ -159,10 +161,11 @@ class Beer(DirtyFieldsMixin, models.Model):
                 self.label_sm_url = None
                 self.alcohol_units = None
                 self.untpd_updated = None
-                self.save()
 
-        except Exception as error:
-            print(error)
+        except Exception:
+            logger.exception(
+                "Error in Beer.save() dirty field handling for %s", self.pk
+            )
 
         super(Beer, self).save(*args, **kwargs)
 
@@ -178,7 +181,7 @@ class Store(models.Model):
     gps_long = models.FloatField()
 
     store_updated = models.DateTimeField(auto_now=True)
-    store_stock_updated = models.DateTimeField(auto_now=True)
+    store_stock_updated = models.DateTimeField(blank=True, null=True)
 
     def __str__(self):
         return self.name
