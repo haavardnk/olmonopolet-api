@@ -40,15 +40,16 @@ class BeerSerializer(DynamicFieldsMixin, serializers.ModelSerializer):
     user_tasted = serializers.BooleanField(read_only=True)
 
     def get_badges(self, beer: Beer):
-        serializer = BadgeSerializer(instance=Badge.objects.filter(beer=beer), many=True)
-        return serializer.data
+        badge_set: models.Manager[Badge] = getattr(beer, "badge_set")
+        return BadgeSerializer(instance=badge_set.all(), many=True).data
 
     def get_stock(self, beer: Beer) -> int | None:
         store = self.context["request"].query_params.get("store") or self.context[
             "request"
         ].query_params.get("check_store")
         if store is not None and len(store.split(",")) < 2:
-            for s in Stock.objects.filter(beer=beer):
+            stock_set: models.Manager[Stock] = getattr(beer, "stock_set")
+            for s in stock_set.all():
                 if str(s.store_id) == store:
                     return s.quantity
             return None
@@ -57,7 +58,8 @@ class BeerSerializer(DynamicFieldsMixin, serializers.ModelSerializer):
     def get_all_stock(self, beer: Beer):
         all_stock = self.context["request"].query_params.get("all_stock")
         if all_stock and parse_bool(all_stock):
-            stocked = [s for s in Stock.objects.filter(beer=beer) if s.quantity != 0]
+            stock_set: models.Manager[Stock] = getattr(beer, "stock_set")
+            stocked = [s for s in stock_set.all() if s.quantity != 0]
             return AllStockSerializer(instance=stocked, many=True).data
         return None
 
@@ -382,9 +384,7 @@ class UserListSerializer(serializers.ModelSerializer):
         if not beer_ids:
             return []
         matched = dict(
-            Beer.objects.filter(untpd_id__in=beer_ids).values_list(
-                "untpd_id", "vmp_id"
-            )
+            Beer.objects.filter(untpd_id__in=beer_ids).values_list("untpd_id", "vmp_id")
         )
         seen: set[str] = set()
         result: list[str] = []
@@ -579,9 +579,7 @@ class SharedUserListSerializer(serializers.ModelSerializer):
         if not beer_ids:
             return []
         matched = dict(
-            Beer.objects.filter(untpd_id__in=beer_ids).values_list(
-                "untpd_id", "vmp_id"
-            )
+            Beer.objects.filter(untpd_id__in=beer_ids).values_list("untpd_id", "vmp_id")
         )
         seen: set[str] = set()
         result: list[str] = []
