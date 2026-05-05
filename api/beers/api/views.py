@@ -46,7 +46,7 @@ from beers.models import (
 from beers.untappd_lists import fetch_user_lists
 from django.contrib.postgres.aggregates import ArrayAgg
 from django.db import models
-from django.db.models import Count, Exists, F, OuterRef, Q, QuerySet, Value
+from django.db.models import Count, Exists, F, Max, OuterRef, Prefetch, Q, QuerySet, Value
 from django.db.models.functions import Greatest
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
@@ -102,7 +102,10 @@ class BeerViewSet(BrowsableMixin, ModelViewSet):
 
     def get_queryset(self) -> QuerySet[Beer]:
         queryset = Beer.objects.all()
-        queryset = queryset.prefetch_related("badge_set", "stock_set")
+        queryset = queryset.select_related("country").prefetch_related(
+            "badge_set",
+            Prefetch("stock_set", queryset=Stock.objects.select_related("store")),
+        )
 
         if self.request.user and self.request.user.is_authenticated:
             queryset = queryset.annotate(
@@ -198,11 +201,22 @@ class StockChangeViewSet(BrowsableMixin, ModelViewSet):
     filterset_class = StockChangeFilter
 
     def get_queryset(self) -> QuerySet[Stock]:
+        beer_qs = Beer.objects.all()
+        if self.request.user and self.request.user.is_authenticated:
+            beer_qs = beer_qs.annotate(
+                user_tasted=Exists(
+                    Tasted.objects.filter(user=self.request.user, beer=OuterRef("pk"))
+                )
+            )
+        else:
+            beer_qs = beer_qs.annotate(user_tasted=Value(False))
+
         return (
             Stock.objects.all()
             .exclude(Q(stocked_at=None) & Q(unstocked_at=None))
             .annotate(stock_unstock_at=Greatest("stocked_at", "unstocked_at"))
-            .select_related("store", "beer")
+            .select_related("store")
+            .prefetch_related(Prefetch("beer", queryset=beer_qs))
             .order_by(
                 F("stock_unstock_at__date").desc(),
                 F("stocked_at").desc(nulls_last=True),
@@ -338,7 +352,13 @@ class UserListViewSet(BrowsableMixin, ModelViewSet):
         )
 
     def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
+        max_sort = (
+            UserList.objects.filter(user=self.request.user).aggregate(
+                max_sort=Max("sort_order")
+            )["max_sort"]
+            or 0
+        )
+        serializer.save(user=self.request.user, sort_order=max_sort + 1)
 
     def perform_destroy(self, instance: UserList) -> None:
         untappd_list = instance.untappd_list
@@ -377,7 +397,12 @@ class UserListViewSet(BrowsableMixin, ModelViewSet):
             )
         serializer = UserListItemCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        max_order = user_list.items.aggregate(m=models.Max("sort_order"))["m"] or 0
+        product_id = serializer.validated_data["product_id"]
+        if not Beer.objects.filter(vmp_id=product_id).exists():
+            return Response({"error": "Product not found"}, status=404)
+        if UserListItem.objects.filter(list=user_list, product_id=product_id).exists():
+            return Response({"error": "Product already in list"}, status=409)
+        max_order = user_list.items.aggregate(m=Max("sort_order"))["m"] or 0
         serializer.save(list=user_list, sort_order=max_order + 1)
         return Response(UserListItemSerializer(serializer.instance).data, status=201)
 
