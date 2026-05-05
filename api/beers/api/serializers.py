@@ -302,7 +302,96 @@ class UserListItemUpdateSerializer(serializers.ModelSerializer):
         return value
 
 
-class UserListSerializer(serializers.ModelSerializer):
+class UserListMethodsMixin:
+    def _untappd_product_ids(self, obj: UserList) -> list[str] | None:
+        if obj.list_type != UserList.ListType.UNTAPPD or not obj.untappd_list:
+            return None
+        beer_ids = obj.untappd_list.untappd_beer_ids or []
+        if not beer_ids:
+            return []
+        matched = dict(
+            Beer.objects.filter(untpd_id__in=beer_ids).values_list("untpd_id", "vmp_id")
+        )
+        seen: set[str] = set()
+        result: list[str] = []
+        for bid in beer_ids:
+            vmp_id = matched.get(bid)
+            if vmp_id is not None:
+                pid = str(vmp_id)
+                if pid not in seen:
+                    seen.add(pid)
+                    result.append(pid)
+        return result
+
+    def get_item_count(self, obj: UserList) -> int:
+        untappd_ids = self._untappd_product_ids(obj)
+        if untappd_ids is not None:
+            return len(untappd_ids)
+        return obj.items.aggregate(total=models.Sum("quantity"))["total"] or 0
+
+    def get_product_ids(self, obj: UserList) -> list[str]:
+        untappd_ids = self._untappd_product_ids(obj)
+        if untappd_ids is not None:
+            return untappd_ids
+        return list(obj.items.values_list("product_id", flat=True))
+
+    def get_is_past(self, obj: UserList) -> bool | None:
+        if obj.list_type != UserList.ListType.EVENT or not obj.event_date:
+            return None
+        from datetime import date
+
+        return obj.event_date < date.today()
+
+    def get_stats(self, obj: UserList) -> dict | None:
+        if obj.list_type != UserList.ListType.CELLAR:
+            return None
+
+        items = obj.items.all()
+        if not items.exists():
+            return {
+                "total_bottles": 0,
+                "total_value": 0,
+                "oldest_year": None,
+                "newest_year": None,
+            }
+
+        total_bottles = items.aggregate(total=models.Sum("quantity"))["total"] or 0
+        years = items.exclude(year__isnull=True).values_list("year", flat=True)
+
+        product_ids = [item.product_id for item in items]
+        prices = dict(
+            Beer.objects.filter(vmp_id__in=product_ids).values_list("vmp_id", "price")
+        )
+        total_value = sum(
+            item.quantity * (prices.get(item.product_id) or 0) for item in items
+        )
+
+        return {
+            "total_bottles": total_bottles,
+            "total_value": round(total_value, 2),
+            "oldest_year": min(years) if years else None,
+            "newest_year": max(years) if years else None,
+        }
+
+    def get_total_price(self, obj: UserList) -> float | None:
+        if obj.list_type != UserList.ListType.SHOPPING:
+            return None
+
+        items = list(obj.items.all())
+        product_ids = [item.product_id for item in items]
+        prices = dict(
+            Beer.objects.filter(vmp_id__in=product_ids).values_list("vmp_id", "price")
+        )
+        total = sum(
+            item.quantity * (prices.get(item.product_id) or 0) for item in items
+        )
+        return round(total, 2)
+
+    def get_is_read_only(self, obj: UserList) -> bool:
+        return obj.list_type == UserList.ListType.UNTAPPD
+
+
+class UserListSerializer(UserListMethodsMixin, serializers.ModelSerializer):
     item_count = serializers.SerializerMethodField()
     product_ids = serializers.SerializerMethodField()
     is_past = serializers.SerializerMethodField()
@@ -377,100 +466,13 @@ class UserListSerializer(serializers.ModelSerializer):
             return "queued"
         return "running"
 
-    def _untappd_product_ids(self, obj) -> list[str] | None:
-        if obj.list_type != UserList.ListType.UNTAPPD or not obj.untappd_list:
-            return None
-        beer_ids = obj.untappd_list.untappd_beer_ids or []
-        if not beer_ids:
-            return []
-        matched = dict(
-            Beer.objects.filter(untpd_id__in=beer_ids).values_list("untpd_id", "vmp_id")
-        )
-        seen: set[str] = set()
-        result: list[str] = []
-        for bid in beer_ids:
-            vmp_id = matched.get(bid)
-            if vmp_id is not None:
-                pid = str(vmp_id)
-                if pid not in seen:
-                    seen.add(pid)
-                    result.append(pid)
-        return result
-
-    def get_item_count(self, obj):
-        untappd_ids = self._untappd_product_ids(obj)
-        if untappd_ids is not None:
-            return len(untappd_ids)
-        return obj.items.aggregate(total=models.Sum("quantity"))["total"] or 0
-
-    def get_product_ids(self, obj):
-        untappd_ids = self._untappd_product_ids(obj)
-        if untappd_ids is not None:
-            return untappd_ids
-        return list(obj.items.values_list("product_id", flat=True))
-
-    def get_is_past(self, obj):
-        if obj.list_type != UserList.ListType.EVENT or not obj.event_date:
-            return None
-        from datetime import date
-
-        return obj.event_date < date.today()
-
-    def get_stats(self, obj):
-        if obj.list_type != UserList.ListType.CELLAR:
-            return None
-
-        items = obj.items.all()
-        if not items.exists():
-            return {
-                "total_bottles": 0,
-                "total_value": 0,
-                "oldest_year": None,
-                "newest_year": None,
-            }
-
-        total_bottles = items.aggregate(total=models.Sum("quantity"))["total"] or 0
-        years = items.exclude(year__isnull=True).values_list("year", flat=True)
-
-        product_ids = [item.product_id for item in items]
-        prices = dict(
-            Beer.objects.filter(vmp_id__in=product_ids).values_list("vmp_id", "price")
-        )
-        total_value = sum(
-            item.quantity * (prices.get(item.product_id) or 0) for item in items
-        )
-
-        return {
-            "total_bottles": total_bottles,
-            "total_value": round(total_value, 2),
-            "oldest_year": min(years) if years else None,
-            "newest_year": max(years) if years else None,
-        }
-
-    def get_items(self, obj):
+    def get_items(self, obj: UserList):
         if not self.context.get("include_items", False):
             return None
         items = obj.items.all()
         return UserListItemSerializer(
             items, many=True, context={"selected_store_id": obj.selected_store_id}
         ).data
-
-    def get_total_price(self, obj):
-        if obj.list_type != UserList.ListType.SHOPPING:
-            return None
-
-        items = list(obj.items.all())
-        product_ids = [item.product_id for item in items]
-        prices = dict(
-            Beer.objects.filter(vmp_id__in=product_ids).values_list("vmp_id", "price")
-        )
-        total = sum(
-            item.quantity * (prices.get(item.product_id) or 0) for item in items
-        )
-        return round(total, 2)
-
-    def get_is_read_only(self, obj) -> bool:
-        return obj.list_type == UserList.ListType.UNTAPPD
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
@@ -525,7 +527,7 @@ class UserListUpdateSerializer(serializers.ModelSerializer):
         fields = ["name", "description", "selected_store_id", "event_date", "list_type"]
 
 
-class SharedUserListSerializer(serializers.ModelSerializer):
+class SharedUserListSerializer(UserListMethodsMixin, serializers.ModelSerializer):
     items = serializers.SerializerMethodField()
     item_count = serializers.SerializerMethodField()
     product_ids = serializers.SerializerMethodField()
@@ -572,109 +574,22 @@ class SharedUserListSerializer(serializers.ModelSerializer):
             "last_synced",
         ]
 
-    def _untappd_product_ids(self, obj) -> list[str] | None:
-        if obj.list_type != UserList.ListType.UNTAPPD or not obj.untappd_list:
-            return None
-        beer_ids = obj.untappd_list.untappd_beer_ids or []
-        if not beer_ids:
-            return []
-        matched = dict(
-            Beer.objects.filter(untpd_id__in=beer_ids).values_list("untpd_id", "vmp_id")
-        )
-        seen: set[str] = set()
-        result: list[str] = []
-        for bid in beer_ids:
-            vmp_id = matched.get(bid)
-            if vmp_id is not None:
-                pid = str(vmp_id)
-                if pid not in seen:
-                    seen.add(pid)
-                    result.append(pid)
-        return result
-
-    def get_item_count(self, obj):
-        untappd_ids = self._untappd_product_ids(obj)
-        if untappd_ids is not None:
-            return len(untappd_ids)
-        return obj.items.aggregate(total=models.Sum("quantity"))["total"] or 0
-
-    def get_product_ids(self, obj):
-        untappd_ids = self._untappd_product_ids(obj)
-        if untappd_ids is not None:
-            return untappd_ids
-        return list(obj.items.values_list("product_id", flat=True))
-
-    def get_items(self, obj):
+    def get_items(self, obj: UserList):
         items = obj.items.all()
         return UserListItemSerializer(
             items, many=True, context={"selected_store_id": obj.selected_store_id}
         ).data
 
-    def get_user_name(self, obj):
+    def get_user_name(self, obj: UserList) -> str:
         if obj.user.first_name or obj.user.last_name:
             return f"{obj.user.first_name} {obj.user.last_name}".strip()
         return obj.user.username
 
-    def get_store_name(self, obj):
+    def get_store_name(self, obj: UserList) -> str | None:
         if obj.selected_store_id:
             store = Store.objects.filter(store_id=obj.selected_store_id).first()
             return store.name if store else None
         return None
-
-    def get_is_past(self, obj):
-        if obj.list_type != UserList.ListType.EVENT or not obj.event_date:
-            return None
-        from datetime import date
-
-        return obj.event_date < date.today()
-
-    def get_stats(self, obj):
-        if obj.list_type != UserList.ListType.CELLAR:
-            return None
-
-        items = obj.items.all()
-        if not items.exists():
-            return {
-                "total_bottles": 0,
-                "total_value": 0,
-                "oldest_year": None,
-                "newest_year": None,
-            }
-
-        total_bottles = items.aggregate(total=models.Sum("quantity"))["total"] or 0
-        years = items.exclude(year__isnull=True).values_list("year", flat=True)
-
-        product_ids = [item.product_id for item in items]
-        prices = dict(
-            Beer.objects.filter(vmp_id__in=product_ids).values_list("vmp_id", "price")
-        )
-        total_value = sum(
-            item.quantity * (prices.get(item.product_id) or 0) for item in items
-        )
-
-        return {
-            "total_bottles": total_bottles,
-            "total_value": round(total_value, 2),
-            "oldest_year": min(years) if years else None,
-            "newest_year": max(years) if years else None,
-        }
-
-    def get_total_price(self, obj):
-        if obj.list_type != UserList.ListType.SHOPPING:
-            return None
-
-        items = list(obj.items.all())
-        product_ids = [item.product_id for item in items]
-        prices = dict(
-            Beer.objects.filter(vmp_id__in=product_ids).values_list("vmp_id", "price")
-        )
-        total = sum(
-            item.quantity * (prices.get(item.product_id) or 0) for item in items
-        )
-        return round(total, 2)
-
-    def get_is_read_only(self, obj) -> bool:
-        return obj.list_type == UserList.ListType.UNTAPPD
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
