@@ -123,9 +123,6 @@ def mocked_responses():
 
 @pytest.mark.django_db
 def test_add_stock(mocked_responses):
-    """
-    Test that stock gets added correctly
-    """
     stores = Store.objects.all()
     products = [
         "øl",
@@ -199,9 +196,6 @@ def test_add_stock(mocked_responses):
 
 @pytest.mark.django_db
 def test_update_and_remove_stock(mocked_responses):
-    """
-    Test that stock gets updated and removed correctly
-    """
     stores = Store.objects.all()
     products = [
         "øl",

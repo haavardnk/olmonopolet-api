@@ -1,6 +1,6 @@
 import pytest
 import responses
-from beers.models import Beer, Option, WrongMatch
+from beers.models import Option, WrongMatch
 from beers.tests.factories import BeerFactory
 
 

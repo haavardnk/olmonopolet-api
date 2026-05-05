@@ -8,9 +8,6 @@ from django.utils import timezone
 
 @pytest.mark.django_db
 def test_deactivate_inactive_beer() -> None:
-    """
-    Test that a beer which is no longer on vinmonopolet gets deactivated.
-    """
     beer = Beer.objects.create(
         vmp_id=12611502,
         vmp_name="Ayinger Winterbock",
@@ -29,9 +26,6 @@ def test_deactivate_inactive_beer() -> None:
 
 @pytest.mark.django_db
 def test_new_beer_does_not_get_deactivated() -> None:
-    """
-    Test that a beer created less than 10 days ago does not get deactivated.
-    """
     Beer.objects.create(
         vmp_id=12611502,
         vmp_name="Ayinger Winterbock",
@@ -47,9 +41,6 @@ def test_new_beer_does_not_get_deactivated() -> None:
 
 @pytest.mark.django_db
 def test_active_beer_does_not_get_deactivated() -> None:
-    """
-    Test that a beer which is active on vinmonopolet does not get deactivated.
-    """
     Beer.objects.create(
         vmp_id=12611502,
         vmp_name="Ayinger Winterbock",
