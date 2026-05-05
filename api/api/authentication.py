@@ -19,19 +19,15 @@ class FirebaseAuthentication(authentication.BaseAuthentication):
 
         if bearer_token:
             try:
-                decoded_token = auth.verify_id_token(
-                    bearer_token, check_revoked=True
-                )
+                decoded_token = auth.verify_id_token(bearer_token, check_revoked=True)
             except auth.ExpiredIdTokenError:
                 raise exceptions.AuthenticationFailed("ID token has expired")
             except auth.RevokedIdTokenError:
                 raise exceptions.AuthenticationFailed("ID token has been revoked")
-            except auth.InvalidIdTokenError as e:
-                raise exceptions.AuthenticationFailed(f"Invalid ID token: {str(e)}")
-            except Exception as e:
-                raise exceptions.AuthenticationFailed(
-                    f"Authentication failed: {str(e)}"
-                )
+            except auth.InvalidIdTokenError:
+                raise exceptions.AuthenticationFailed("Invalid ID token")
+            except Exception:
+                raise exceptions.AuthenticationFailed("Authentication failed")
         else:
             session_cookie = request.COOKIES.get("session")
             if not session_cookie:
@@ -44,23 +40,19 @@ class FirebaseAuthentication(authentication.BaseAuthentication):
                 raise exceptions.AuthenticationFailed("Session has expired")
             except auth.RevokedSessionCookieError:
                 raise exceptions.AuthenticationFailed("Session has been revoked")
-            except auth.InvalidSessionCookieError as e:
-                raise exceptions.AuthenticationFailed(f"Invalid session: {str(e)}")
-            except Exception as e:
-                raise exceptions.AuthenticationFailed(
-                    f"Authentication failed: {str(e)}"
-                )
+            except auth.InvalidSessionCookieError:
+                raise exceptions.AuthenticationFailed("Invalid session")
+            except Exception:
+                raise exceptions.AuthenticationFailed("Authentication failed")
 
         uid: str | None = decoded_token.get("uid")
         email: str | None = decoded_token.get("email")
 
         if not uid:
-            raise exceptions.AuthenticationFailed("Invalid token: missing uid")
+            raise exceptions.AuthenticationFailed("Invalid token")
         if not email:
-            raise exceptions.AuthenticationFailed("Invalid token: missing email")
+            raise exceptions.AuthenticationFailed("Invalid token")
 
-        user, _ = User.objects.get_or_create(
-            email=email, defaults={"username": email}
-        )
+        user, _ = User.objects.get_or_create(email=email, defaults={"username": email})
 
         return (user, None)
