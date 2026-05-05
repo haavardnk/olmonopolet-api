@@ -1,11 +1,14 @@
 import io
+
 import pytest
 from beers.models import (
     Badge,
     Stock,
     Tasted,
+    UntappdRssFeed,
     UserList,
     UserListItem,
+    WrongMatch,
 )
 from beers.tests.factories import (
     BeerFactory,
@@ -293,3 +296,81 @@ class TestUserListViewSet:
         )
         response = client.get("/lists/")
         assert "items" not in response.data[0]
+
+
+@pytest.mark.django_db
+class TestWrongMatchViewSet:
+    def test_create_unauthenticated(self) -> None:
+        client = APIClient()
+        beer = BeerFactory()
+        response = client.post(
+            "/wrongmatch/",
+            {"beer": beer.pk, "suggested_url": "https://untappd.com/beer/22222"},
+        )
+        assert response.status_code == 201
+        assert WrongMatch.objects.filter(beer=beer).exists()
+
+
+@pytest.mark.django_db
+class TestUntappdRssFeedMe:
+    def test_get_no_feed_returns_404(self, auth_client: tuple) -> None:
+        client, _user = auth_client
+        response = client.get("/rss/me/")
+        assert response.status_code == 404
+
+    def test_put_creates_feed(self, auth_client: tuple) -> None:
+        client, user = auth_client
+        response = client.put(
+            "/rss/me/",
+            {"feed_url": "https://untappd.com/rss/user/newuser?key=xyz789"},
+        )
+        assert response.status_code == 201
+        assert UntappdRssFeed.objects.filter(user=user).exists()
+
+    def test_delete_existing_feed(self, auth_client: tuple) -> None:
+        client, user = auth_client
+        UntappdRssFeed.objects.create(
+            user=user,
+            feed_url="https://untappd.com/rss/user/testuser?key=abc123",
+        )
+        response = client.delete("/rss/me/")
+        assert response.status_code == 204
+        assert not UntappdRssFeed.objects.filter(user=user).exists()
+
+    def test_unauthenticated_returns_401(self) -> None:
+        client = APIClient()
+        response = client.get("/rss/me/")
+        assert response.status_code in (401, 403)
+
+
+@pytest.mark.django_db
+class TestSharedUserListSerializer:
+    def test_pops_null_fields(self) -> None:
+        user = UserFactory()
+        user_list = UserList.objects.create(user=user, name="Shared", sort_order=1)
+        client = APIClient()
+        response = client.get(f"/lists/shared/{user_list.share_token}/")
+        assert response.status_code == 200
+        assert "is_past" not in response.data
+        assert "stats" not in response.data
+        assert "untappd_list_id" not in response.data
+
+    def test_includes_user_name(self) -> None:
+        user = UserFactory()
+        user.first_name = "Test"
+        user.last_name = "User"
+        user.save()
+        user_list = UserList.objects.create(user=user, name="Shared", sort_order=1)
+        client = APIClient()
+        response = client.get(f"/lists/shared/{user_list.share_token}/")
+        assert response.data["user_name"] == "Test User"
+
+    def test_includes_store_name(self) -> None:
+        user = UserFactory()
+        store = StoreFactory(store_id=999, name="My Store")
+        user_list = UserList.objects.create(
+            user=user, name="Shared", sort_order=1, selected_store_id=store.store_id
+        )
+        client = APIClient()
+        response = client.get(f"/lists/shared/{user_list.share_token}/")
+        assert response.data["store_name"] == "My Store"
