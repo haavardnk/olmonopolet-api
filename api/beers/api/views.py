@@ -179,10 +179,8 @@ class BeerViewSet(BrowsableMixin, ModelViewSet):
 
         try:
             checkins = parse_untappd_file(uploaded_file)
-        except Exception as e:
-            return Response(
-                {"error": "Failed to parse file", "details": str(e)}, status=400
-            )
+        except Exception:
+            return Response({"error": "Failed to parse file"}, status=400)
 
         if checkins is None:
             return Response(
@@ -617,8 +615,8 @@ class UntappdRssFeedViewSet(BrowsableMixin, ModelViewSet):
             return Response({"error": "No active RSS feed configured"}, status=404)
         try:
             output = sync_rss_feeds(user=request.user.username)
-        except Exception as e:
-            return Response({"error": str(e)}, status=500)
+        except Exception:
+            return Response({"error": "Sync failed"}, status=500)
         for line in reversed(output.strip().splitlines()):
             try:
                 summary = _json.loads(line)
