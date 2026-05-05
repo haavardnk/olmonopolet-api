@@ -513,13 +513,6 @@ class UserListCreateSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
 
-    def validate(self, attrs):
-        if attrs.get("list_type") == UserList.ListType.EVENT and not attrs.get(
-            "event_date"
-        ):
-            pass
-        return attrs
-
 
 class UserListUpdateSerializer(serializers.ModelSerializer):
     class Meta:
