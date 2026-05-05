@@ -587,8 +587,11 @@ class SharedUserListSerializer(UserListMethodsMixin, serializers.ModelSerializer
 
     def get_store_name(self, obj: UserList) -> str | None:
         if obj.selected_store_id:
-            store = Store.objects.filter(store_id=obj.selected_store_id).first()
-            return store.name if store else None
+            return getattr(obj, "_store_name", None) or (
+                Store.objects.filter(store_id=obj.selected_store_id)
+                .values_list("name", flat=True)
+                .first()
+            )
         return None
 
     def to_representation(self, instance):
