@@ -165,13 +165,19 @@ class UserListItemInline(admin.TabularInline):
     readonly_fields = ("beer_name", "created_at")
     ordering = ("sort_order",)
 
+    def get_queryset(self, request: HttpRequest) -> QuerySet:
+        qs = super().get_queryset(request)
+        return qs.annotate(
+            _beer_name=models.Subquery(
+                Beer.objects.filter(vmp_id=models.OuterRef("product_id")).values(
+                    "vmp_name"
+                )[:1]
+            )
+        )
+
     @admin.display(description="Beer")
     def beer_name(self, obj):
-        try:
-            beer = Beer.objects.get(vmp_id=obj.product_id)
-            return beer.vmp_name
-        except Beer.DoesNotExist:
-            return f"Unknown ({obj.product_id})"
+        return getattr(obj, "_beer_name", None) or f"Unknown ({obj.product_id})"
 
 
 class UserListInline(admin.TabularInline):
