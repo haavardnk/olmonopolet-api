@@ -8,6 +8,7 @@ from beers.api.filters import (
     StockChangeFilter,
 )
 from beers.api.pagination import LargeResultPagination, Pagination
+from beers.api.utils import bulk_import_tasted, parse_untappd_file
 from beers.api.serializers import (
     BeerSerializer,
     CountrySerializer,
@@ -129,6 +130,64 @@ class BeerViewSet(BrowsableMixin, ModelViewSet):
             .order_by("style")
         )
         return Response(list(styles))
+
+    @action(
+        detail=True,
+        methods=["post", "delete"],
+        permission_classes=[permissions.IsAuthenticated],
+    )
+    def mark_tasted(self, request, pk=None):
+        beer = self.get_object()
+
+        if request.method == "POST":
+            _tasted, created = Tasted.objects.get_or_create(
+                user=request.user, beer=beer
+            )
+            if created:
+                return Response({"status": "marked as tasted"}, status=201)
+            return Response({"status": "already marked as tasted"}, status=200)
+
+        deleted_count, _ = Tasted.objects.filter(
+            user=request.user, beer=beer
+        ).delete()
+        if deleted_count > 0:
+            return Response({"status": "removed from tasted"}, status=204)
+        return Response({"status": "not found"}, status=404)
+
+    @action(
+        detail=False,
+        methods=["post"],
+        permission_classes=[permissions.IsAuthenticated],
+    )
+    def bulk_mark_tasted(self, request) -> Response:
+        uploaded_file = request.FILES.get("file")
+        if not uploaded_file:
+            return Response({"error": "No file provided"}, status=400)
+
+        try:
+            checkins = parse_untappd_file(uploaded_file)
+        except Exception as e:
+            return Response(
+                {"error": "Failed to parse file", "details": str(e)}, status=400
+            )
+
+        if checkins is None:
+            return Response(
+                {"error": "Unsupported file format. Use .csv or .json"}, status=400
+            )
+
+        if not checkins:
+            return Response({"error": "No valid beer IDs found in file"}, status=400)
+
+        result = bulk_import_tasted(request.user, checkins)
+
+        return Response(
+            {
+                **result,
+                "message": f"Successfully imported {result['imported_count']} beers from {result['total_check_ins']} check-ins",
+            },
+            status=200,
+        )
 
 
 class StockChangeViewSet(BrowsableMixin, ModelViewSet):
