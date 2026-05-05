@@ -46,7 +46,19 @@ from beers.models import (
 from beers.untappd_lists import fetch_user_lists
 from django.contrib.postgres.aggregates import ArrayAgg
 from django.db import models
-from django.db.models import Count, Exists, F, Max, OuterRef, Prefetch, Q, QuerySet, Value
+from django.db.models import (
+    Case,
+    Count,
+    Exists,
+    F,
+    Max,
+    OuterRef,
+    Prefetch,
+    Q,
+    QuerySet,
+    Value,
+    When,
+)
 from django.db.models.functions import Greatest
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
@@ -150,9 +162,7 @@ class BeerViewSet(BrowsableMixin, ModelViewSet):
                 return Response({"status": "marked as tasted"}, status=201)
             return Response({"status": "already marked as tasted"}, status=200)
 
-        deleted_count, _ = Tasted.objects.filter(
-            user=request.user, beer=beer
-        ).delete()
+        deleted_count, _ = Tasted.objects.filter(user=request.user, beer=beer).delete()
         if deleted_count > 0:
             return Response({"status": "removed from tasted"}, status=204)
         return Response({"status": "not found"}, status=404)
@@ -450,8 +460,10 @@ class UserListViewSet(BrowsableMixin, ModelViewSet):
         serializer = ListReorderSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         list_ids: list[int] = serializer.validated_data["list_ids"]
-        for i, list_id in enumerate(list_ids):
-            UserList.objects.filter(pk=list_id, user=request.user).update(sort_order=i)
+        cases = [When(pk=lid, then=Value(i)) for i, lid in enumerate(list_ids)]
+        UserList.objects.filter(pk__in=list_ids, user=request.user).update(
+            sort_order=Case(*cases, output_field=models.IntegerField())
+        )
         return Response(status=204)
 
     @action(detail=True, methods=["post", "patch"], url_path="items/reorder")
@@ -464,8 +476,10 @@ class UserListViewSet(BrowsableMixin, ModelViewSet):
         serializer = ItemReorderSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         item_ids: list[int] = serializer.validated_data["item_ids"]
-        for i, item_id in enumerate(item_ids):
-            UserListItem.objects.filter(pk=item_id, list=user_list).update(sort_order=i)
+        cases = [When(pk=iid, then=Value(i)) for i, iid in enumerate(item_ids)]
+        UserListItem.objects.filter(pk__in=item_ids, list=user_list).update(
+            sort_order=Case(*cases, output_field=models.IntegerField())
+        )
         return Response(status=204)
 
 
