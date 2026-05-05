@@ -167,7 +167,7 @@ class Beer(DirtyFieldsMixin, models.Model):
                 "Error in Beer.save() dirty field handling for %s", self.pk
             )
 
-        super(Beer, self).save(*args, **kwargs)
+        super().save(*args, **kwargs)
 
 
 class Store(models.Model):
@@ -222,7 +222,7 @@ class WrongMatch(models.Model):
         return self.suggested_url
 
     def save(self, *args, **kwargs):
-        super(WrongMatch, self).save(*args, **kwargs)
+        super().save(*args, **kwargs)
 
         suggested_url = self._resolve_suggested_url()
 

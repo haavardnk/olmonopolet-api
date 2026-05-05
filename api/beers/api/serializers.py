@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from datetime import date
 
 import feedparser
 import requests as http_requests
@@ -40,16 +41,14 @@ class BeerSerializer(DynamicFieldsMixin, serializers.ModelSerializer):
     user_tasted = serializers.BooleanField(read_only=True)
 
     def get_badges(self, beer: Beer):
-        badge_set: models.Manager[Badge] = getattr(beer, "badge_set")
-        return BadgeSerializer(instance=badge_set.all(), many=True).data
+        return BadgeSerializer(instance=beer.badge_set.all(), many=True).data
 
     def get_stock(self, beer: Beer) -> int | None:
         store = self.context["request"].query_params.get("store") or self.context[
             "request"
         ].query_params.get("check_store")
-        if store is not None and len(store.split(",")) < 2:
-            stock_set: models.Manager[Stock] = getattr(beer, "stock_set")
-            for s in stock_set.all():
+        if store is not None and "," not in store:
+            for s in beer.stock_set.all():
                 if str(s.store_id) == store:
                     return s.quantity
             return None
@@ -58,8 +57,7 @@ class BeerSerializer(DynamicFieldsMixin, serializers.ModelSerializer):
     def get_all_stock(self, beer: Beer):
         all_stock = self.context["request"].query_params.get("all_stock")
         if all_stock and parse_bool(all_stock):
-            stock_set: models.Manager[Stock] = getattr(beer, "stock_set")
-            stocked = [s for s in stock_set.all() if s.quantity != 0]
+            stocked = [s for s in beer.stock_set.all() if s.quantity != 0]
             return AllStockSerializer(instance=stocked, many=True).data
         return None
 
@@ -338,8 +336,6 @@ class UserListMethodsMixin:
     def get_is_past(self, obj: UserList) -> bool | None:
         if obj.list_type != UserList.ListType.EVENT or not obj.event_date:
             return None
-        from datetime import date
-
         return obj.event_date < date.today()
 
     def get_stats(self, obj: UserList) -> dict | None:
