@@ -333,6 +333,10 @@ class UserList(models.Model):
     )
     selected_store_id = models.IntegerField(blank=True, null=True)
     event_date = models.DateField(blank=True, null=True)
+    show_quantity = models.BooleanField(default=False)
+    show_store = models.BooleanField(default=False)
+    show_vintage = models.BooleanField(default=False)
+    show_prices = models.BooleanField(default=True)
     untappd_list = models.ForeignKey(
         UntappdList,
         on_delete=models.SET_NULL,
@@ -347,6 +351,10 @@ class UserList(models.Model):
 
     class Meta:
         ordering = ["sort_order", "created_at"]
+
+    @property
+    def is_untappd(self) -> bool:
+        return self.untappd_list_id is not None
 
     def __str__(self):
         return f"{self.user.username} - {self.name}"

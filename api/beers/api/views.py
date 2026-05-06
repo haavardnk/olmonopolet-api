@@ -346,6 +346,18 @@ class UserListViewSet(BrowsableMixin, ModelViewSet):
             return UserListUpdateSerializer
         return UserListSerializer
 
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop("partial", False)
+        instance = self.get_object()
+        serializer = UserListUpdateSerializer(
+            instance, data=request.data, partial=partial
+        )
+        serializer.is_valid(raise_exception=True)
+        instance = serializer.save()
+        return Response(
+            UserListSerializer(instance, context=self.get_serializer_context()).data
+        )
+
     def get_serializer_context(self):
         context = super().get_serializer_context()
         if self.action == "retrieve":
@@ -399,7 +411,7 @@ class UserListViewSet(BrowsableMixin, ModelViewSet):
     @action(detail=True, methods=["post"], url_path="items")
     def add_item(self, request, pk=None):
         user_list = self.get_object()
-        if user_list.list_type == UserList.ListType.UNTAPPD:
+        if user_list.untappd_list_id is not None:
             return Response(
                 {"detail": "Cannot modify items on an Untappd list"}, status=403
             )
@@ -421,7 +433,7 @@ class UserListViewSet(BrowsableMixin, ModelViewSet):
     )
     def item_detail(self, request, pk=None, item_pk: str | None = None):
         user_list = self.get_object()
-        if user_list.list_type == UserList.ListType.UNTAPPD:
+        if user_list.untappd_list_id is not None:
             return Response(
                 {"detail": "Cannot modify items on an Untappd list"}, status=403
             )
@@ -443,7 +455,7 @@ class UserListViewSet(BrowsableMixin, ModelViewSet):
     )
     def product_detail(self, request, pk=None, product_id=None):
         user_list = self.get_object()
-        if user_list.list_type == UserList.ListType.UNTAPPD:
+        if user_list.untappd_list_id is not None:
             return Response(
                 {"detail": "Cannot modify items on an Untappd list"}, status=403
             )
@@ -467,7 +479,7 @@ class UserListViewSet(BrowsableMixin, ModelViewSet):
     @action(detail=True, methods=["post", "patch"], url_path="items/reorder")
     def reorder_items(self, request, pk=None):
         user_list = self.get_object()
-        if user_list.list_type == UserList.ListType.UNTAPPD:
+        if user_list.untappd_list_id is not None:
             return Response(
                 {"detail": "Cannot modify items on an Untappd list"}, status=403
             )

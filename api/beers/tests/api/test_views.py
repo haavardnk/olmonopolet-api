@@ -174,8 +174,13 @@ class TestUserListViewSet:
 
     def test_add_item_to_untappd_list_blocked(self, auth_client: tuple) -> None:
         client, user = auth_client
+        from beers.models import UntappdList
+
+        untappd_list = UntappdList.objects.create(
+            untappd_list_id=1, untappd_username="test", name="Test"
+        )
         user_list = UserList.objects.create(
-            user=user, name="Untappd", sort_order=1, list_type=UserList.ListType.UNTAPPD
+            user=user, name="Untappd", sort_order=1, untappd_list=untappd_list
         )
         beer = BeerFactory()
         response = client.post(
@@ -296,6 +301,120 @@ class TestUserListViewSet:
         )
         response = client.get("/lists/")
         assert "items" not in response.data[0]
+
+    def test_create_with_flags(self, auth_client: tuple) -> None:
+        client, _user = auth_client
+        response = client.post(
+            "/lists/",
+            {
+                "name": "Flagged",
+                "show_quantity": True,
+                "show_store": True,
+                "show_vintage": False,
+                "show_prices": True,
+            },
+            format="json",
+        )
+        assert response.status_code == 201
+        assert response.data["show_quantity"] is True
+        assert response.data["show_store"] is True
+        assert response.data["show_vintage"] is False
+        assert response.data["show_prices"] is True
+
+    def test_create_with_list_type_backward_compat(self, auth_client: tuple) -> None:
+        client, _user = auth_client
+        response = client.post(
+            "/lists/",
+            {"name": "Shopping BC", "list_type": "shopping"},
+            format="json",
+        )
+        assert response.status_code == 201
+        assert response.data["show_quantity"] is True
+        assert response.data["show_store"] is True
+        assert response.data["show_vintage"] is False
+
+    def test_create_cellar_backward_compat(self, auth_client: tuple) -> None:
+        client, _user = auth_client
+        response = client.post(
+            "/lists/",
+            {"name": "Cellar BC", "list_type": "cellar"},
+            format="json",
+        )
+        assert response.status_code == 201
+        assert response.data["show_quantity"] is True
+        assert response.data["show_vintage"] is True
+        assert response.data["show_store"] is False
+
+    def test_update_flags(self, auth_client: tuple) -> None:
+        client, user = auth_client
+        user_list = UserList.objects.create(user=user, name="Test", sort_order=1)
+        response = client.patch(
+            f"/lists/{user_list.pk}/",
+            {"show_vintage": True, "show_quantity": True},
+            format="json",
+        )
+        assert response.status_code == 200
+        user_list.refresh_from_db()
+        assert user_list.show_vintage is True
+        assert user_list.show_quantity is True
+
+    def test_flags_in_response(self, auth_client: tuple) -> None:
+        client, user = auth_client
+        UserList.objects.create(
+            user=user,
+            name="Full",
+            sort_order=1,
+            show_quantity=True,
+            show_store=True,
+        )
+        response = client.get("/lists/")
+        assert response.status_code == 200
+        data = response.data[0]
+        assert data["show_quantity"] is True
+        assert data["show_store"] is True
+        assert data["show_vintage"] is False
+        assert data["show_prices"] is True
+
+    def test_stats_only_when_show_vintage(self, auth_client: tuple) -> None:
+        client, user = auth_client
+        no_vintage = UserList.objects.create(
+            user=user, name="No Vintage", sort_order=1, show_vintage=False
+        )
+        with_vintage = UserList.objects.create(
+            user=user, name="With Vintage", sort_order=2, show_vintage=True
+        )
+        response_no = client.get(f"/lists/{no_vintage.pk}/")
+        assert "stats" not in response_no.data
+        response_yes = client.get(f"/lists/{with_vintage.pk}/")
+        assert "stats" in response_yes.data
+
+    def test_total_price_only_when_show_store(self, auth_client: tuple) -> None:
+        client, user = auth_client
+        no_store = UserList.objects.create(
+            user=user, name="No Store", sort_order=1, show_store=False
+        )
+        with_store = UserList.objects.create(
+            user=user, name="With Store", sort_order=2, show_store=True
+        )
+        response_no = client.get(f"/lists/{no_store.pk}/")
+        assert "total_price" not in response_no.data
+        response_yes = client.get(f"/lists/{with_store.pk}/")
+        assert "total_price" in response_yes.data
+
+    def test_shared_list_includes_flags(self) -> None:
+        user = UserFactory()
+        user_list = UserList.objects.create(
+            user=user,
+            name="Shared Flags",
+            sort_order=1,
+            show_quantity=True,
+            show_store=True,
+        )
+        client = APIClient()
+        response = client.get(f"/lists/shared/{user_list.share_token}/")
+        assert response.status_code == 200
+        assert response.data["show_quantity"] is True
+        assert response.data["show_store"] is True
 
 
 @pytest.mark.django_db

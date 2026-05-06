@@ -302,7 +302,7 @@ class UserListItemUpdateSerializer(serializers.ModelSerializer):
 
 class UserListMethodsMixin:
     def _untappd_product_ids(self, obj: UserList) -> list[str] | None:
-        if obj.list_type != UserList.ListType.UNTAPPD or not obj.untappd_list:
+        if not obj.untappd_list:
             return None
         beer_ids = obj.untappd_list.untappd_beer_ids or []
         if not beer_ids:
@@ -314,11 +314,13 @@ class UserListMethodsMixin:
         result: list[str] = []
         for bid in beer_ids:
             vmp_id = matched.get(bid)
-            if vmp_id is not None:
-                pid = str(vmp_id)
-                if pid not in seen:
-                    seen.add(pid)
-                    result.append(pid)
+            if vmp_id is None:
+                continue
+            pid = str(vmp_id)
+            if pid in seen:
+                continue
+            seen.add(pid)
+            result.append(pid)
         return result
 
     def get_item_count(self, obj: UserList) -> int:
@@ -334,12 +336,12 @@ class UserListMethodsMixin:
         return list(obj.items.values_list("product_id", flat=True))
 
     def get_is_past(self, obj: UserList) -> bool | None:
-        if obj.list_type != UserList.ListType.EVENT or not obj.event_date:
+        if not obj.event_date:
             return None
         return obj.event_date < date.today()
 
     def get_stats(self, obj: UserList) -> dict | None:
-        if obj.list_type != UserList.ListType.CELLAR:
+        if not obj.show_vintage:
             return None
 
         items = obj.items.all()
@@ -355,9 +357,10 @@ class UserListMethodsMixin:
         years = items.exclude(year__isnull=True).values_list("year", flat=True)
 
         product_ids = [item.product_id for item in items]
-        prices = dict(
-            Beer.objects.filter(vmp_id__in=product_ids).values_list("vmp_id", "price")
-        )
+        prices = {
+            str(vmp_id): price
+            for vmp_id, price in Beer.objects.filter(vmp_id__in=product_ids).values_list("vmp_id", "price")
+        }
         total_value = sum(
             item.quantity * (prices.get(item.product_id) or 0) for item in items
         )
@@ -370,21 +373,22 @@ class UserListMethodsMixin:
         }
 
     def get_total_price(self, obj: UserList) -> float | None:
-        if obj.list_type != UserList.ListType.SHOPPING:
+        if not obj.show_store:
             return None
 
         items = list(obj.items.all())
         product_ids = [item.product_id for item in items]
-        prices = dict(
-            Beer.objects.filter(vmp_id__in=product_ids).values_list("vmp_id", "price")
-        )
+        prices = {
+            str(vmp_id): price
+            for vmp_id, price in Beer.objects.filter(vmp_id__in=product_ids).values_list("vmp_id", "price")
+        }
         total = sum(
             item.quantity * (prices.get(item.product_id) or 0) for item in items
         )
         return round(total, 2)
 
     def get_is_read_only(self, obj: UserList) -> bool:
-        return obj.list_type == UserList.ListType.UNTAPPD
+        return obj.untappd_list_id is not None
 
 
 class UserListSerializer(UserListMethodsMixin, serializers.ModelSerializer):
@@ -415,6 +419,10 @@ class UserListSerializer(UserListMethodsMixin, serializers.ModelSerializer):
             "list_type",
             "selected_store_id",
             "event_date",
+            "show_quantity",
+            "show_store",
+            "show_vintage",
+            "show_prices",
             "share_token",
             "sort_order",
             "created_at",
@@ -450,7 +458,7 @@ class UserListSerializer(UserListMethodsMixin, serializers.ModelSerializer):
         ]
 
     def get_sync_status(self, obj: UserList) -> str | None:
-        if obj.list_type != UserList.ListType.UNTAPPD or not obj.untappd_list:
+        if not obj.untappd_list:
             return None
         task_id = obj.untappd_list.sync_task_id
         if not task_id:
@@ -470,21 +478,39 @@ class UserListSerializer(UserListMethodsMixin, serializers.ModelSerializer):
             items, many=True, context={"selected_store_id": obj.selected_store_id}
         ).data
 
-    def to_representation(self, instance):
+    def to_representation(self, instance: UserList):
         data = super().to_representation(instance)
         if data.get("is_past") is None:
             data.pop("is_past", None)
-        if data.get("stats") is None:
+        if not instance.show_vintage:
             data.pop("stats", None)
         if data.get("items") is None:
             data.pop("items", None)
-        if data.get("total_price") is None:
+        if not instance.show_store:
             data.pop("total_price", None)
-        if data.get("untappd_list_id") is None:
+        if not instance.untappd_list_id:
             data.pop("untappd_list_id", None)
             data.pop("untappd_username", None)
             data.pop("last_synced", None)
         return data
+
+
+FLAG_DEFAULTS: dict[str, dict[str, bool]] = {
+    "shopping": {"show_quantity": True, "show_store": True},
+    "cellar": {"show_quantity": True, "show_vintage": True},
+}
+
+
+def compute_list_type(obj: UserList) -> str:
+    if obj.untappd_list_id:
+        return "untappd"
+    if obj.show_store:
+        return "shopping"
+    if obj.show_vintage:
+        return "cellar"
+    if obj.event_date:
+        return "event"
+    return "standard"
 
 
 class UserListCreateSerializer(serializers.ModelSerializer):
@@ -496,6 +522,10 @@ class UserListCreateSerializer(serializers.ModelSerializer):
             "description",
             "list_type",
             "event_date",
+            "show_quantity",
+            "show_store",
+            "show_vintage",
+            "show_prices",
             "sort_order",
             "share_token",
             "created_at",
@@ -509,11 +539,45 @@ class UserListCreateSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
 
+    def create(self, validated_data: dict) -> UserList:
+        list_type = validated_data.pop("list_type", "standard")
+        flag_keys = {"show_quantity", "show_store", "show_vintage", "show_prices"}
+        has_flags = any(k in validated_data for k in flag_keys)
+        if not has_flags:
+            for key, val in FLAG_DEFAULTS.get(list_type, {}).items():
+                validated_data.setdefault(key, val)
+        instance = super().create(validated_data)
+        instance.list_type = compute_list_type(instance)
+        instance.save(update_fields=["list_type"])
+        return instance
+
 
 class UserListUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserList
-        fields = ["name", "description", "selected_store_id", "event_date", "list_type"]
+        fields = [
+            "name",
+            "description",
+            "selected_store_id",
+            "event_date",
+            "list_type",
+            "show_quantity",
+            "show_store",
+            "show_vintage",
+            "show_prices",
+        ]
+
+    def update(self, instance: UserList, validated_data: dict) -> UserList:
+        list_type = validated_data.pop("list_type", None)
+        flag_keys = {"show_quantity", "show_store", "show_vintage", "show_prices"}
+        has_flags = any(k in validated_data for k in flag_keys)
+        if list_type and not has_flags:
+            for key, val in FLAG_DEFAULTS.get(list_type, {}).items():
+                validated_data[key] = val
+        instance = super().update(instance, validated_data)
+        instance.list_type = compute_list_type(instance)
+        instance.save(update_fields=["list_type"])
+        return instance
 
 
 class SharedUserListSerializer(UserListMethodsMixin, serializers.ModelSerializer):
@@ -546,6 +610,10 @@ class SharedUserListSerializer(UserListMethodsMixin, serializers.ModelSerializer
             "selected_store_id",
             "store_name",
             "event_date",
+            "show_quantity",
+            "show_store",
+            "show_vintage",
+            "show_prices",
             "share_token",
             "sort_order",
             "created_at",
@@ -583,15 +651,15 @@ class SharedUserListSerializer(UserListMethodsMixin, serializers.ModelSerializer
             )
         return None
 
-    def to_representation(self, instance):
+    def to_representation(self, instance: UserList):
         data = super().to_representation(instance)
         if data.get("is_past") is None:
             data.pop("is_past", None)
-        if data.get("stats") is None:
+        if not instance.show_vintage:
             data.pop("stats", None)
-        if data.get("total_price") is None:
+        if not instance.show_store:
             data.pop("total_price", None)
-        if data.get("untappd_list_id") is None:
+        if not instance.untappd_list_id:
             data.pop("untappd_list_id", None)
             data.pop("untappd_username", None)
             data.pop("last_synced", None)

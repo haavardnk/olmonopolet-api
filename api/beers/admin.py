@@ -197,17 +197,32 @@ class UserListAdmin(admin.ModelAdmin):
         "name",
         "user",
         "list_type",
+        "show_quantity",
+        "show_store",
+        "show_vintage",
+        "show_prices",
         "item_count",
         "sort_order",
         "created_at",
     )
-    list_filter = ("user", "list_type")
+    list_filter = (
+        "user",
+        "list_type",
+        "show_quantity",
+        "show_store",
+        "show_vintage",
+        "show_prices",
+    )
     search_fields = ("name", "user__username")
     fields = (
         "user",
         "name",
         "description",
         "list_type",
+        "show_quantity",
+        "show_store",
+        "show_vintage",
+        "show_prices",
         "selected_store_id",
         "event_date",
         "sort_order",
