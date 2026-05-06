@@ -378,6 +378,20 @@ class UserListItem(models.Model):
         return f"{self.list.name} - {self.product_id}"
 
 
+class FollowedList(models.Model):
+    user = models.ForeignKey(
+        "auth.User", on_delete=CASCADE, related_name="followed_lists"
+    )
+    share_token = models.CharField(max_length=100)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ["user", "share_token"]
+
+    def __str__(self):
+        return f"{self.user.username} follows {self.share_token}"
+
+
 class UntappdCheckin(models.Model):
     untpd_checkin_id = models.IntegerField(primary_key=True)
     user = models.ForeignKey(

@@ -5,6 +5,7 @@ from django.contrib.auth.admin import UserAdmin
 from django.contrib.auth.models import User
 from django.db import models
 from django.db.models import Count, QuerySet
+from django.db.models.functions import Cast
 from django.http import HttpRequest
 
 from beers.models import (
@@ -20,6 +21,7 @@ from beers.models import (
     UntappdCheckin,
     UntappdList,
     UntappdRssFeed,
+    FollowedList,
     UserList,
     UserListItem,
     VmpNotReleased,
@@ -169,9 +171,9 @@ class UserListItemInline(admin.TabularInline):
         qs = super().get_queryset(request)
         return qs.annotate(
             _beer_name=models.Subquery(
-                Beer.objects.filter(vmp_id=models.OuterRef("product_id")).values(
-                    "vmp_name"
-                )[:1]
+                Beer.objects.filter(
+                    vmp_id=Cast(models.OuterRef("product_id"), models.BigIntegerField())
+                ).values("vmp_name")[:1]
             )
         )
 
@@ -332,6 +334,14 @@ class UntappdRssFeedAdmin(admin.ModelAdmin):
     list_filter = ("active",)
     search_fields = ("user__username", "user__email")
     readonly_fields = ("last_synced", "created_at")
+
+
+@admin.register(FollowedList)
+class FollowedListAdmin(admin.ModelAdmin):
+    list_display = ("user", "share_token", "created_at")
+    list_filter = ("created_at",)
+    search_fields = ("user__username", "share_token")
+    raw_id_fields = ("user",)
 
 
 admin.site.register(Badge)

@@ -33,6 +33,7 @@ from beers.api.serializers import (
 from beers.models import (
     Beer,
     Country,
+    FollowedList,
     Release,
     Stock,
     Store,
@@ -371,6 +372,34 @@ class UserListViewSet(BrowsableMixin, ModelViewSet):
             .prefetch_related("items")
         )
 
+    def list(self, request, *args, **kwargs):
+        owned = self.get_queryset()
+        context = self.get_serializer_context()
+        owned_data = [
+            dict(item) for item in UserListSerializer(owned, many=True, context=context).data
+        ]
+
+        followed_entries = FollowedList.objects.filter(user=request.user)
+        followed_data = []
+        max_sort = max((item["sort_order"] for item in owned_data), default=0)
+        for i, entry in enumerate(followed_entries):
+            user_list = (
+                UserList.objects.filter(share_token=entry.share_token)
+                .select_related("untappd_list", "user")
+                .prefetch_related("items")
+                .first()
+            )
+            if user_list:
+                item = dict(UserListSerializer(user_list, context=context).data)
+                item["is_followed"] = True
+                item["sort_order"] = max_sort + 1 + i
+                item["user_name"] = (
+                    user_list.user.get_full_name() or user_list.user.username
+                )
+                followed_data.append(item)
+
+        return Response(owned_data + followed_data)
+
     def perform_create(self, serializer):
         max_sort = (
             UserList.objects.filter(user=self.request.user).aggregate(
@@ -407,6 +436,33 @@ class UserListViewSet(BrowsableMixin, ModelViewSet):
             return Response(status=404)
         serializer = SharedUserListSerializer(user_list)
         return Response(serializer.data)
+
+    @action(
+        detail=False,
+        methods=["post"],
+        url_path="shared/(?P<token>[^/.]+)/follow",
+        permission_classes=[permissions.IsAuthenticated],
+    )
+    def follow(self, request, token: str | None = None):
+        user_list = UserList.objects.filter(share_token=token).first()
+        if not user_list:
+            return Response(status=404)
+        _, created = FollowedList.objects.get_or_create(
+            user=request.user, share_token=token
+        )
+        return Response(status=201 if created else 200)
+
+    @action(
+        detail=False,
+        methods=["delete"],
+        url_path="shared/(?P<token>[^/.]+)/unfollow",
+        permission_classes=[permissions.IsAuthenticated],
+    )
+    def unfollow(self, request, token: str | None = None):
+        deleted, _ = FollowedList.objects.filter(
+            user=request.user, share_token=token
+        ).delete()
+        return Response(status=204 if deleted else 404)
 
     @action(detail=True, methods=["post"], url_path="items")
     def add_item(self, request, pk=None):
