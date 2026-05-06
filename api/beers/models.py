@@ -337,6 +337,7 @@ class UserList(models.Model):
     show_store = models.BooleanField(default=False)
     show_vintage = models.BooleanField(default=False)
     show_prices = models.BooleanField(default=True)
+    show_notes = models.BooleanField(default=True)
     untappd_list = models.ForeignKey(
         UntappdList,
         on_delete=models.SET_NULL,

@@ -423,6 +423,7 @@ class UserListSerializer(UserListMethodsMixin, serializers.ModelSerializer):
             "show_store",
             "show_vintage",
             "show_prices",
+            "show_notes",
             "share_token",
             "sort_order",
             "created_at",
@@ -526,6 +527,7 @@ class UserListCreateSerializer(serializers.ModelSerializer):
             "show_store",
             "show_vintage",
             "show_prices",
+            "show_notes",
             "sort_order",
             "share_token",
             "created_at",
@@ -541,7 +543,7 @@ class UserListCreateSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data: dict) -> UserList:
         list_type = validated_data.pop("list_type", "standard")
-        flag_keys = {"show_quantity", "show_store", "show_vintage", "show_prices"}
+        flag_keys = {"show_quantity", "show_store", "show_vintage", "show_prices", "show_notes"}
         has_flags = any(k in validated_data for k in flag_keys)
         if not has_flags:
             for key, val in FLAG_DEFAULTS.get(list_type, {}).items():
@@ -565,11 +567,12 @@ class UserListUpdateSerializer(serializers.ModelSerializer):
             "show_store",
             "show_vintage",
             "show_prices",
+            "show_notes",
         ]
 
     def update(self, instance: UserList, validated_data: dict) -> UserList:
         list_type = validated_data.pop("list_type", None)
-        flag_keys = {"show_quantity", "show_store", "show_vintage", "show_prices"}
+        flag_keys = {"show_quantity", "show_store", "show_vintage", "show_prices", "show_notes"}
         has_flags = any(k in validated_data for k in flag_keys)
         if list_type and not has_flags:
             for key, val in FLAG_DEFAULTS.get(list_type, {}).items():
@@ -614,6 +617,7 @@ class SharedUserListSerializer(UserListMethodsMixin, serializers.ModelSerializer
             "show_store",
             "show_vintage",
             "show_prices",
+            "show_notes",
             "share_token",
             "sort_order",
             "created_at",
