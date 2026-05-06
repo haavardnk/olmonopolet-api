@@ -598,11 +598,19 @@ class UntappdListViewSet(BrowsableMixin, ModelViewSet):
         if existing:
             return Response(UserListSerializer(existing).data, status=200)
 
+        max_sort = (
+            UserList.objects.filter(user=request.user).aggregate(
+                max_sort=Max("sort_order")
+            )["max_sort"]
+            or 0
+        )
+
         user_list = UserList.objects.create(
             user=request.user,
             name=data["name"],
             list_type=UserList.ListType.UNTAPPD,
             untappd_list=untappd_list,
+            sort_order=max_sort + 1,
         )
 
         task_id = async_task(
