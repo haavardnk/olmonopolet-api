@@ -489,7 +489,7 @@ class UserListSerializer(UserListMethodsMixin, serializers.ModelSerializer):
             data.pop("items", None)
         if not instance.show_store:
             data.pop("total_price", None)
-        if not instance.untappd_list_id:
+        if instance.untappd_list_id is None:
             data.pop("untappd_list_id", None)
             data.pop("untappd_username", None)
             data.pop("last_synced", None)
@@ -503,7 +503,7 @@ FLAG_DEFAULTS: dict[str, dict[str, bool]] = {
 
 
 def compute_list_type(obj: UserList) -> str:
-    if obj.untappd_list_id:
+    if obj.untappd_list_id is not None:
         return "untappd"
     if obj.show_store:
         return "shopping"
@@ -663,7 +663,7 @@ class SharedUserListSerializer(UserListMethodsMixin, serializers.ModelSerializer
             data.pop("stats", None)
         if not instance.show_store:
             data.pop("total_price", None)
-        if not instance.untappd_list_id:
+        if instance.untappd_list_id is None:
             data.pop("untappd_list_id", None)
             data.pop("untappd_username", None)
             data.pop("last_synced", None)
