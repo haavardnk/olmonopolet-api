@@ -146,3 +146,60 @@ class TestNullsAlwaysLastOrderingFilter:
 
         assert beer_high_abv.pk in pks
         assert beer_low_abv.pk not in pks
+
+    @pytest.mark.parametrize("ordering", ["brewery", "-brewery", "rating", "vmp_name"])
+    def test_ordering_is_stable_across_calls(self, ordering: str) -> None:
+        for _ in range(20):
+            BeerFactory(brewery="Same Brewery", rating=4.0)
+        for _ in range(5):
+            BeerFactory(brewery=None, rating=None)
+
+        ordering_filter = NullsAlwaysLastOrderingFilter()
+
+        class FakeView(APIView):
+            ordering_fields = ["brewery", "rating", "vmp_name"]
+
+        request = self._make_request(ordering)
+        first = list(
+            ordering_filter.filter_queryset(
+                request, Beer.objects.all(), FakeView()
+            ).values_list("pk", flat=True)
+        )
+        second = list(
+            ordering_filter.filter_queryset(
+                request, Beer.objects.all(), FakeView()
+            ).values_list("pk", flat=True)
+        )
+
+        assert first == second
+        assert len(first) == len(set(first))
+
+
+@pytest.mark.django_db
+class TestPaginationStability:
+    def test_brewery_ordering_paginated_no_drift(self) -> None:
+        from rest_framework.test import APIClient
+
+        for _ in range(30):
+            BeerFactory(brewery="Acme Brewing")
+        for _ in range(10):
+            BeerFactory(brewery=None)
+
+        client = APIClient()
+        expected = set(Beer.objects.values_list("vmp_id", flat=True))
+
+        seen: set[int] = set()
+        page = 1
+        while True:
+            response = client.get(
+                f"/beers/?ordering=brewery&page={page}&page_size=7"
+            )
+            assert response.status_code == 200
+            for row in response.data["results"]:
+                assert row["vmp_id"] not in seen
+                seen.add(row["vmp_id"])
+            if not response.data.get("next"):
+                break
+            page += 1
+
+        assert seen == expected

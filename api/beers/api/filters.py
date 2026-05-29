@@ -29,6 +29,12 @@ class NullsAlwaysLastOrderingFilter(filters.OrderingFilter):
                 else:
                     f_ordering.append(F(field_name).asc(nulls_last=True))
 
+            tie_breakers = {"vmp_name": F("vmp_name").asc(), "pk": F("pk").asc()}
+            used = {f.lstrip("-") for f in ordering if f}
+            for name, expr in tie_breakers.items():
+                if name not in used:
+                    f_ordering.append(expr)
+
             return queryset.order_by(*f_ordering)
 
         return queryset
