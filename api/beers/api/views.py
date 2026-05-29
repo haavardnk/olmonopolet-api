@@ -229,12 +229,13 @@ class StockChangeViewSet(BrowsableMixin, ModelViewSet):
             .order_by(
                 F("stock_unstock_at__date").desc(),
                 F("stocked_at").desc(nulls_last=True),
+                F("pk").asc(),
             )
         )
 
 
 class StoreViewSet(BrowsableMixin, ModelViewSet):
-    queryset = Store.objects.all().order_by("name")
+    queryset = Store.objects.all().order_by("name", "store_id")
     serializer_class = StoreSerializer
     pagination_class = LargeResultPagination
     permission_classes = [permissions.DjangoModelPermissionsOrAnonReadOnly]
@@ -242,12 +243,14 @@ class StoreViewSet(BrowsableMixin, ModelViewSet):
     filter_backends = (filters.SearchFilter, filters.OrderingFilter)
     search_fields = ["name", "address", "store_id"]
     ordering_fields = ["name", "store_id"]
-    ordering = ["name"]
+    ordering = ["name", "store_id"]
 
 
 class StockViewSet(BrowsableMixin, ModelViewSet):
     queryset = (
-        Stock.objects.all().order_by("store__store_id").select_related("store", "beer")
+        Stock.objects.all()
+        .order_by("store__store_id", "pk")
+        .select_related("store", "beer")
     )
     serializer_class = StockSerializer
     pagination_class = Pagination
@@ -270,7 +273,7 @@ class ReleaseViewSet(BrowsableMixin, ModelViewSet):
     permission_classes = [permissions.AllowAny]
 
     def get_queryset(self) -> QuerySet[Release]:
-        qs = Release.objects.filter(active=True).order_by("-release_date")
+        qs = Release.objects.filter(active=True).order_by("-release_date", "pk")
         if self.action in ("list", "retrieve"):
             qs = qs.annotate(
                 product_count=Count("beer", distinct=True),
