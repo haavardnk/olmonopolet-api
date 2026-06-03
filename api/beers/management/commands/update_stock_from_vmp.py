@@ -1,12 +1,20 @@
 from __future__ import annotations
 
+import random
 import re
+import time
 from argparse import ArgumentParser
 
 import cloudscraper25
+from requests.exceptions import JSONDecodeError, RequestException
 from beers.models import Beer, ExternalAPI, Stock, Store
+from django.conf import settings
 from django.core.management.base import BaseCommand
 from django.utils import timezone
+
+
+class VmpApiError(Exception):
+    pass
 
 
 class Command(BaseCommand):
@@ -42,6 +50,7 @@ class Command(BaseCommand):
             interpreter="nodejs",
             browser="chrome",
             enable_stealth=True,
+            stealth_options={"human_like_delays": False},
         )
 
         for store in stores.iterator():
@@ -83,9 +92,15 @@ class Command(BaseCommand):
         ]
 
         for product in products:
-            product_updated, product_stocked, product_beers = (
-                self._process_product_for_store(scraper, url, store, product)
-            )
+            try:
+                product_updated, product_stocked, product_beers = (
+                    self._process_product_for_store(scraper, url, store, product)
+                )
+            except VmpApiError as exc:
+                self.stdout.write(
+                    self.style.WARNING(f"Store {store.name} not updated: {exc}")
+                )
+                return updated, stocked, unstocked
             updated += product_updated
             stocked += product_stocked
             stocked_beers.extend(product_beers)
@@ -150,13 +165,35 @@ class Command(BaseCommand):
 
         req_url = f"{url}?currentPage={page}&fields=FULL&pageSize=100&q={query}"
 
-        response_data = scraper.get(
-            req_url, headers={"Accept": "application/json"}
-        ).json()
-        pagination = response_data.get("pagination", {})
-        total_pages = int(pagination.get("totalPages", 0))
+        for attempt in range(3):
+            if not settings.TESTING:
+                time.sleep(random.uniform(0.3, 1.0))
+            try:
+                response = scraper.get(
+                    req_url, headers={"Accept": "application/json"}, timeout=30
+                )
+            except RequestException:
+                time.sleep(2**attempt)
+                continue
 
-        return response_data, total_pages
+            if not response.ok:
+                time.sleep(2**attempt)
+                continue
+
+            try:
+                response_data = response.json()
+            except JSONDecodeError:
+                time.sleep(2**attempt)
+                continue
+
+            pagination = response_data.get("pagination", {})
+            total_pages = int(pagination.get("totalPages", 0))
+            return response_data, total_pages
+
+        raise VmpApiError(
+            f"no valid JSON response from vinmonopolet after retries "
+            f"(store {store_id} product '{product}' page {page})"
+        )
 
     def _extract_quantity(self, product_data: dict) -> int:
         infos = product_data["productAvailability"]["storesAvailability"].get(

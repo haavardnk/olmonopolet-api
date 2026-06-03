@@ -1,5 +1,6 @@
 import json
 import os
+import sys
 from pathlib import Path
 
 import firebase_admin
@@ -10,6 +11,7 @@ from sentry_sdk.integrations.django import DjangoIntegration
 BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "dummykey")
 DEBUG = int(os.getenv("DEBUG_VALUE", 1))
+TESTING = "pytest" in sys.modules
 DEFAULT_AUTO_FIELD = "django.db.models.AutoField"
 
 firebase_creds_json = os.getenv("FIREBASE_CREDENTIALS_JSON")
