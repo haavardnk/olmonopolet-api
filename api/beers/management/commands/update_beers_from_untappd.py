@@ -10,7 +10,7 @@ import cloudscraper25
 from beers.models import Beer
 from bs4 import BeautifulSoup
 from cloudscraper25 import CloudScraper
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 from django.utils import timezone
 
 
@@ -22,14 +22,21 @@ class Command(BaseCommand):
         beers = self._get_prioritized_beers()
         scraper = cloudscraper25.create_scraper()
         updated = 0
+        attempted = 0
 
         for beer in beers[: options["calls"]]:
+            attempted += 1
             if self._update_beer_from_untappd(beer, scraper):
                 updated += 1
 
         self.stdout.write(
             self.style.SUCCESS(f"Updated {updated} beers out of {options['calls']}")
         )
+
+        if attempted and updated == 0:
+            raise CommandError(
+                f"All {attempted} untappd updates failed (untappd unreachable)"
+            )
 
     def _get_prioritized_beers(self) -> list[Beer]:
         beers1 = Beer.objects.filter(
@@ -80,11 +87,6 @@ class Command(BaseCommand):
         self._update_beer_fields(beer, soup, json_ld_data)
         beer.untpd_updated = timezone.now()
         beer.prioritize_recheck = False
-
-        if beer.volume and beer.abv:
-            beer.alcohol_units = (beer.volume * 1000 * beer.abv / 100 * 0.8) / 12
-            if beer.price and beer.alcohol_units > 0:
-                beer.price_per_alcohol_unit = beer.price / beer.alcohol_units
 
         beer.save()
         return True

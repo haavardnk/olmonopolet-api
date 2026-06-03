@@ -14,6 +14,8 @@ DEBUG = int(os.getenv("DEBUG_VALUE", 1))
 TESTING = "pytest" in sys.modules
 DEFAULT_AUTO_FIELD = "django.db.models.AutoField"
 
+VMP_PROXY = os.getenv("VMP_PROXY")
+
 firebase_creds_json = os.getenv("FIREBASE_CREDENTIALS_JSON")
 if firebase_creds_json and not firebase_admin._apps:
     cred = credentials.Certificate(json.loads(firebase_creds_json))

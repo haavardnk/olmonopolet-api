@@ -108,6 +108,21 @@ class Beer(DirtyFieldsMixin, models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     active = models.BooleanField(default=True)
 
+    def _compute_price_per_volume(self) -> float | None:
+        if self.price and self.volume:
+            return self.price / self.volume
+        return None
+
+    def _compute_alcohol_units(self) -> float | None:
+        if self.volume and self.abv:
+            return (self.volume * 1000 * self.abv / 100 * 0.8) / 12
+        return None
+
+    def _compute_price_per_alcohol_unit(self) -> float | None:
+        if self.price and self.alcohol_units and self.alcohol_units > 0:
+            return self.price / self.alcohol_units
+        return None
+
     def _compute_value_score(self) -> float | None:
         if (
             self.rating
@@ -126,7 +141,6 @@ class Beer(DirtyFieldsMixin, models.Model):
         return self.vmp_name
 
     def save(self, *args, **kwargs):
-        self.value_score = self._compute_value_score()
         try:
             dirty_fields = self.get_dirty_fields()
             if (
@@ -166,6 +180,11 @@ class Beer(DirtyFieldsMixin, models.Model):
             logger.exception(
                 "Error in Beer.save() dirty field handling for %s", self.pk
             )
+
+        self.price_per_volume = self._compute_price_per_volume()
+        self.alcohol_units = self._compute_alcohol_units()
+        self.price_per_alcohol_unit = self._compute_price_per_alcohol_unit()
+        self.value_score = self._compute_value_score()
 
         super().save(*args, **kwargs)
 

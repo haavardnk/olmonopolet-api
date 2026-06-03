@@ -11,7 +11,7 @@ import requests
 from beers.api.utils import sync_unmatched_checkins
 from beers.models import UntappdCheckin, UntappdRssFeed
 from bs4 import BeautifulSoup
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 
 
 class Command(BaseCommand):
@@ -34,10 +34,13 @@ class Command(BaseCommand):
         scraper = requests.Session()
         scraper.headers.update({"User-Agent": "Mozilla/5.0"})
         total_imported = 0
+        failed = 0
 
         for feed_obj in feeds:
-            count = self._process_feed(feed_obj, scraper)
-            total_imported += count
+            imported, ok = self._process_feed(feed_obj, scraper)
+            total_imported += imported
+            if not ok:
+                failed += 1
 
         result = sync_unmatched_checkins()
         summary = {
@@ -47,7 +50,14 @@ class Command(BaseCommand):
         }
         self.stdout.write(json.dumps(summary))
 
-    def _process_feed(self, feed_obj: UntappdRssFeed, scraper: requests.Session) -> int:
+        if failed and failed == len(feeds):
+            raise CommandError(
+                f"All {failed} RSS feeds failed to parse (untappd unreachable)"
+            )
+
+    def _process_feed(
+        self, feed_obj: UntappdRssFeed, scraper: requests.Session
+    ) -> tuple[int, bool]:
         self.stdout.write(f"Processing feed for {feed_obj.user.username}")
 
         parsed = feedparser.parse(feed_obj.feed_url)
@@ -55,14 +65,14 @@ class Command(BaseCommand):
             self.stdout.write(
                 self.style.ERROR(f"Failed to parse feed for {feed_obj.user.username}")
             )
-            return 0
+            return 0, False
 
         new_entries = self._filter_new_entries(parsed.entries)
         if not new_entries:
             self.stdout.write(f"No new entries for {feed_obj.user.username}")
             feed_obj.last_synced = datetime.now(timezone.utc)
             feed_obj.save(update_fields=["last_synced"])
-            return 0
+            return 0, True
 
         self.stdout.write(
             f"Found {len(new_entries)} new entries for {feed_obj.user.username}"
@@ -95,7 +105,7 @@ class Command(BaseCommand):
         feed_obj.save(update_fields=["last_synced"])
 
         self.stdout.write(f"Imported {imported} checkins for {feed_obj.user.username}")
-        return imported
+        return imported, True
 
     def _filter_new_entries(self, entries: list) -> list:
         checkin_ids: list[int] = []

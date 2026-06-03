@@ -1,62 +1,76 @@
 from __future__ import annotations
 
-import random
 import re
 import time
 from argparse import ArgumentParser
 
-import cloudscraper25
-from requests.exceptions import JSONDecodeError, RequestException
-from beers.models import Beer, ExternalAPI, Stock, Store
+from beers.models import Beer, Stock, Store
+from beers.vmp import VmpApiError, VmpClient
+from beers.vmp.commands import CATEGORIES, VmpCommand
+from beers.vmp.models import VmpProduct
 from django.conf import settings
-from django.core.management.base import BaseCommand
+from django.core.management.base import CommandError
 from django.utils import timezone
 
 
-class VmpApiError(Exception):
-    pass
-
-
-class Command(BaseCommand):
+class Command(VmpCommand):
     def add_arguments(self, parser: ArgumentParser) -> None:
         parser.add_argument("stores", type=int, help="Number of stores to process")
+        parser.add_argument(
+            "--store-delay",
+            type=float,
+            default=0,
+            help="Seconds to pause between stores to reduce rate-limiting",
+        )
+        parser.add_argument(
+            "--request-delay-min",
+            type=float,
+            default=0.5,
+            help="Minimum seconds to pause between requests",
+        )
+        parser.add_argument(
+            "--request-delay-max",
+            type=float,
+            default=1.5,
+            help="Maximum seconds to pause between requests",
+        )
 
     def handle(self, *args, **options) -> None:
-        try:
-            baseurl = ExternalAPI.objects.get(name="vinmonopolet").baseurl
-        except ExternalAPI.DoesNotExist:
-            self.stdout.write(
-                self.style.ERROR("vinmonopolet external API configuration not found")
-            )
-            return
+        client = self.get_client(
+            (options["request_delay_min"], options["request_delay_max"])
+        )
 
-        url = f"{baseurl}products/search"
-        stores_limit = options["stores"]
-
-        stores = Store.objects.all().order_by("store_stock_updated")[:stores_limit]
+        stores = Store.objects.all().order_by("store_stock_updated")[
+            : options["stores"]
+        ]
 
         if not stores:
             self.stdout.write(self.style.WARNING("No stores found to update"))
             return
 
+        store_delay = options["store_delay"]
         self.stdout.write(f"Processing {len(stores)} stores...")
 
         updated = 0
         stocked = 0
         unstocked = 0
         stores_updated = 0
+        failed: list[str] = []
 
-        scraper = cloudscraper25.create_scraper(
-            interpreter="nodejs",
-            browser="chrome",
-            enable_stealth=True,
-            stealth_options={"human_like_delays": False},
-        )
+        for index, store in enumerate(stores.iterator()):
+            if index and store_delay and not settings.TESTING:
+                time.sleep(store_delay)
+            try:
+                store_updated, store_stocked, store_unstocked = (
+                    self._update_store_stock(client, store)
+                )
+            except VmpApiError as exc:
+                failed.append(store.name)
+                self.stdout.write(
+                    self.style.WARNING(f"Store {store.name} not updated: {exc}")
+                )
+                continue
 
-        for store in stores.iterator():
-            store_updated, store_stocked, store_unstocked = self._update_store_stock(
-                scraper, url, store
-            )
             updated += store_updated
             stocked += store_stocked
             unstocked += store_unstocked
@@ -74,37 +88,40 @@ class Command(BaseCommand):
             )
         )
 
+        if failed:
+            raise CommandError(
+                f"{len(failed)}/{len(stores)} stores failed: {', '.join(failed)}"
+            )
+
     def _update_store_stock(
-        self, scraper: cloudscraper25.CloudScraper, url: str, store: Store
+        self, client: VmpClient, store: Store
     ) -> tuple[int, int, int]:
         updated = 0
         stocked = 0
-        unstocked = 0
         stocked_beers: list[Beer] = []
 
-        products = [
-            "øl",
-            "sider",
-            "mjød",
-            "alkoholfritt_alkoholfritt_øl",
-            "alkoholfritt_alkoholfri_ingefærøl",
-            "alkoholfritt_alkoholfri_sider",
-        ]
+        for category, sub_category in CATEGORIES:
+            products = client.iter_products(
+                category, sub_category, store_id=store.store_id
+            )
+            category_products = list(products)
 
-        for product in products:
-            try:
-                product_updated, product_stocked, product_beers = (
-                    self._process_product_for_store(scraper, url, store, product)
-                )
-            except VmpApiError as exc:
-                self.stdout.write(
-                    self.style.WARNING(f"Store {store.name} not updated: {exc}")
-                )
-                return updated, stocked, unstocked
-            updated += product_updated
-            stocked += product_stocked
-            stocked_beers.extend(product_beers)
+            for product in category_products:
+                try:
+                    beer = Beer.objects.get(vmp_id=int(product.code))
+                except Beer.DoesNotExist:
+                    continue
 
+                stocked_beers.append(beer)
+
+                quantity = self._extract_quantity(product)
+                beer_updated, beer_stocked = self._update_beer_stock(
+                    store, beer, quantity
+                )
+                updated += beer_updated
+                stocked += beer_stocked
+
+        unstocked = 0
         if stocked_beers:
             unstocked = self._unstock_missing_beers(store, stocked_beers)
 
@@ -113,95 +130,13 @@ class Command(BaseCommand):
 
         return updated, stocked, unstocked
 
-    def _process_product_for_store(
-        self,
-        scraper: cloudscraper25.CloudScraper,
-        url: str,
-        store: Store,
-        product: str,
-    ) -> tuple[int, int, list[Beer]]:
-        updated = 0
-        stocked = 0
-        stocked_beers: list[Beer] = []
+    def _extract_quantity(self, product: VmpProduct) -> int:
+        availability = product.product_availability
+        if availability is None or availability.stores_availability is None:
+            return 0
 
-        response, total_pages = self._call_api(scraper, url, store.store_id, 0, product)
-
-        for page in range(total_pages):
-            response, _ = self._call_api(scraper, url, store.store_id, page, product)
-
-            for product_data in response.get("products", []):
-                try:
-                    beer = Beer.objects.get(vmp_id=int(product_data["code"]))
-                except Beer.DoesNotExist:
-                    continue
-
-                stocked_beers.append(beer)
-
-                quantity = self._extract_quantity(product_data)
-                beer_updated, beer_stocked = self._update_beer_stock(
-                    store, beer, quantity
-                )
-
-                updated += beer_updated
-                stocked += beer_stocked
-
-        return updated, stocked, stocked_beers
-
-    def _call_api(
-        self,
-        scraper: cloudscraper25.CloudScraper,
-        url: str,
-        store_id: int,
-        page: int,
-        product: str,
-    ) -> tuple[dict, int]:
-        if "alkoholfritt" in product:
-            query = (
-                f":name-asc:mainCategory:alkoholfritt:"
-                f"mainSubCategory:{product}:availableInStores:{store_id}"
-            )
-        else:
-            query = f":name-asc:mainCategory:{product}:availableInStores:{store_id}"
-
-        req_url = f"{url}?currentPage={page}&fields=FULL&pageSize=100&q={query}"
-
-        for attempt in range(3):
-            if not settings.TESTING:
-                time.sleep(random.uniform(0.3, 1.0))
-            try:
-                response = scraper.get(
-                    req_url, headers={"Accept": "application/json"}, timeout=30
-                )
-            except RequestException:
-                time.sleep(2**attempt)
-                continue
-
-            if not response.ok:
-                time.sleep(2**attempt)
-                continue
-
-            try:
-                response_data = response.json()
-            except JSONDecodeError:
-                time.sleep(2**attempt)
-                continue
-
-            pagination = response_data.get("pagination", {})
-            total_pages = int(pagination.get("totalPages", 0))
-            return response_data, total_pages
-
-        raise VmpApiError(
-            f"no valid JSON response from vinmonopolet after retries "
-            f"(store {store_id} product '{product}' page {page})"
-        )
-
-    def _extract_quantity(self, product_data: dict) -> int:
-        infos = product_data["productAvailability"]["storesAvailability"].get(
-            "infos", []
-        )
-        for info in infos:
-            availability_text = info.get("availability", "")
-            quantities = re.findall(r"\b\d+\b", availability_text)
+        for info in availability.stores_availability.infos:
+            quantities = re.findall(r"\b\d+\b", info.availability or "")
             if quantities:
                 return int(quantities[0])
         return 0

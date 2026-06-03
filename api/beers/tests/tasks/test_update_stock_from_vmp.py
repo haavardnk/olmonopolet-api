@@ -41,6 +41,12 @@ def json_response(product_id, stock):
             "products": [
                 {
                     "code": product_id,
+                    "name": "Test Beer",
+                    "url": f"/p/{product_id}",
+                    "volume": {"value": 50},
+                    "main_category": {"name": "Øl"},
+                    "main_country": {"name": "Norge"},
+                    "product_selection": "Basisutvalget",
                     "productAvailability": {
                         "storesAvailability": {
                             "infos": [
@@ -60,7 +66,11 @@ def json_response(product_id, stock):
 @pytest.fixture(autouse=True)
 def setup(db):
     ExternalAPI.objects.create(
-        name="vinmonopolet",
+        name="vinmonopolet_v2",
+        baseurl="https://api.test.com/v4/",
+    )
+    ExternalAPI.objects.create(
+        name="vinmonopolet_v3",
         baseurl="https://api.test.com/v4/",
     )
     Store.objects.create(

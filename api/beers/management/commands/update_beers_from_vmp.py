@@ -1,162 +1,85 @@
 from __future__ import annotations
 
-import cloudscraper25
-from beers.api.utils import get_or_create_country
-from beers.models import Beer, ExternalAPI
-from django.core.management.base import BaseCommand
-from django.utils import timezone
+import time
+from argparse import ArgumentParser
+
+from beers.models import Beer
+from beers.vmp.commands import (
+    CATEGORIES,
+    VmpCommand,
+    apply_product_fields,
+    post_delivery,
+    store_delivery,
+)
+from beers.vmp.models import VmpProduct
+from django.conf import settings
 
 
-class Command(BaseCommand):
-    def handle(self, *args, **options) -> None:
-        try:
-            baseurl = ExternalAPI.objects.get(name="vinmonopolet").baseurl
-        except ExternalAPI.DoesNotExist:
-            self.stdout.write(
-                self.style.ERROR("vinmonopolet external API configuration not found")
-            )
-            return
-
-        url = f"{baseurl}products/search"
-        updated = 0
-        created = 0
-
-        scraper = cloudscraper25.create_scraper(
-            interpreter="nodejs",
-            browser="chrome",
-            enable_stealth=True,
+class Command(VmpCommand):
+    def add_arguments(self, parser: ArgumentParser) -> None:
+        parser.add_argument(
+            "--store-delay",
+            type=float,
+            default=0,
+            help="Seconds to pause between categories to reduce rate-limiting",
+        )
+        parser.add_argument(
+            "--request-delay-min",
+            type=float,
+            default=0.5,
+            help="Minimum seconds to pause between requests",
+        )
+        parser.add_argument(
+            "--request-delay-max",
+            type=float,
+            default=1.5,
+            help="Maximum seconds to pause between requests",
         )
 
-        products = [
-            "øl",
-            "sider",
-            "mjød",
-            "alkoholfritt_alkoholfritt_øl",
-            "alkoholfritt_alkoholfri_ingefærøl",
-            "alkoholfritt_alkoholfri_sider",
-        ]
+    def handle(self, *args, **options) -> None:
+        client = self.get_client(
+            (options["request_delay_min"], options["request_delay_max"])
+        )
 
-        for product in products:
-            product_updated, product_created = self._process_product_category(
-                scraper, url, product
-            )
-            updated += product_updated
-            created += product_created
+        store_delay = options["store_delay"]
+
+        updated = 0
+        created = 0
+        skipped = 0
+
+        for index, (category, sub_category) in enumerate(CATEGORIES):
+            if index and store_delay and not settings.TESTING:
+                time.sleep(store_delay)
+            for product in client.iter_products(
+                category, sub_category, sort="relevance"
+            ):
+                code = int(product.code)
+                try:
+                    beer = Beer.objects.get(vmp_id=code)
+                    is_new = False
+                except Beer.DoesNotExist:
+                    beer = Beer(vmp_id=code)
+                    is_new = True
+
+                if not self._save_beer(beer, product):
+                    skipped += 1
+                elif is_new:
+                    created += 1
+                else:
+                    updated += 1
 
         self.stdout.write(
             self.style.SUCCESS(
-                f"Updated {updated} beers and created {created} new beers!"
+                f"Updated {updated} beers, created {created} new beers, "
+                f"skipped {skipped} without price!"
             )
         )
 
-    def _process_product_category(
-        self, scraper: cloudscraper25.CloudScraper, url: str, product: str
-    ) -> tuple[int, int]:
-        updated = 0
-        created = 0
-
-        response, total_pages = self._call_api(scraper, url, 0, product)
-
-        for page in range(total_pages):
-            if page > 0:
-                response, _ = self._call_api(scraper, url, page, product)
-
-            for beer_data in response.get("products", []):
-                try:
-                    beer = Beer.objects.get(vmp_id=int(beer_data["code"]))
-                    self._update_existing_beer(beer, beer_data)
-                    updated += 1
-                except Beer.DoesNotExist:
-                    self._create_new_beer(beer_data)
-                    created += 1
-
-        return updated, created
-
-    def _call_api(
-        self,
-        scraper: cloudscraper25.CloudScraper,
-        url: str,
-        page: int,
-        product: str,
-    ) -> tuple[dict, int]:
-        if "alkoholfritt" in product:
-            query = f":relevance:mainCategory:alkoholfritt:mainSubCategory:{product}"
-        else:
-            query = f":relevance:mainCategory:{product}"
-
-        req_url = f"{url}?currentPage={page}&fields=FULL&pageSize=100&q={query}"
-
-        response = scraper.get(req_url, headers={"Accept": "application/json"}).json()
-        pagination = response.get("pagination", {})
-        total_pages = int(pagination.get("totalPages", 0))
-
-        return response, total_pages
-
-    def _update_existing_beer(self, beer: Beer, beer_data: dict) -> None:
-        beer.vmp_name = beer_data["name"]
-        beer.main_category = beer_data["main_category"]["name"]
-
-        if beer_data.get("main_sub_category"):
-            beer.sub_category = beer_data["main_sub_category"]["name"]
-
-        beer.country = get_or_create_country(beer_data["main_country"]["name"])
-        beer.price = beer_data["price"]["value"]
-        beer.volume = float(beer_data["volume"]["value"]) / 100.0
-        beer.price_per_volume = self._calculate_price_per_volume(
-            float(beer_data["price"]["value"]), float(beer_data["volume"]["value"])
-        )
-        beer.product_selection = beer_data["product_selection"]
-        beer.vmp_url = f"https://www.vinmonopolet.no{beer_data['url']}"
-        beer.post_delivery = beer_data["productAvailability"]["deliveryAvailability"][
-            "availableForPurchase"
-        ]
-        beer.store_delivery = any(
-            info.get("readableValue") == "Kan bestilles til alle butikker"
-            for info in beer_data["productAvailability"]["storesAvailability"].get(
-                "infos", []
-            )
-        )
-        beer.vmp_updated = timezone.now()
-
-        if not beer.active:
-            beer.active = True
-
+    def _save_beer(self, beer: Beer, product: VmpProduct) -> bool:
+        if product.price is None:
+            return False
+        apply_product_fields(beer, product)
+        beer.post_delivery = post_delivery(product)
+        beer.store_delivery = store_delivery(product)
         beer.save()
-
-    def _create_new_beer(self, beer_data: dict) -> Beer:
-        volume_value = float(beer_data["volume"]["value"])
-        price_value = float(beer_data["price"]["value"])
-
-        beer = Beer.objects.create(
-            vmp_id=int(beer_data["code"]),
-            vmp_name=beer_data["name"],
-            main_category=beer_data["main_category"]["name"],
-            country=get_or_create_country(beer_data["main_country"]["name"]),
-            price=price_value,
-            volume=volume_value / 100.0,
-            price_per_volume=self._calculate_price_per_volume(
-                price_value, volume_value
-            ),
-            product_selection=beer_data["product_selection"],
-            post_delivery=beer_data["productAvailability"]["deliveryAvailability"][
-                "availableForPurchase"
-            ],
-            store_delivery=any(
-                info.get("readableValue") == "Kan bestilles til alle butikker"
-                for info in beer_data["productAvailability"]["storesAvailability"].get(
-                    "infos", []
-                )
-            ),
-            vmp_url=f"https://www.vinmonopolet.no{beer_data['url']}",
-            vmp_updated=timezone.now(),
-        )
-
-        if beer_data.get("main_sub_category"):
-            beer.sub_category = beer_data["main_sub_category"]["name"]
-            beer.save()
-
-        return beer
-
-    def _calculate_price_per_volume(self, price: float, volume_value: float) -> float:
-        volume_in_liters = volume_value / 100.0
-        return price / volume_in_liters
+        return True

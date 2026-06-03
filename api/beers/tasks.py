@@ -13,8 +13,21 @@ def _call_command_with_output(command: str, *args, **kwargs) -> str:
     return out.getvalue()
 
 
-def update_beers_from_vmp() -> str:
-    return _call_command_with_output("update_beers_from_vmp")
+def update_beers_from_vmp(
+    store_delay: float | None = None,
+    request_delay_min: float | None = None,
+    request_delay_max: float | None = None,
+) -> str:
+    kwargs = {
+        k: v
+        for k, v in (
+            ("store_delay", store_delay),
+            ("request_delay_min", request_delay_min),
+            ("request_delay_max", request_delay_max),
+        )
+        if v is not None
+    }
+    return _call_command_with_output("update_beers_from_vmp", **kwargs)
 
 
 def match_untappd(**kwargs) -> str:
@@ -31,8 +44,26 @@ def update_details_from_vmp(calls: int) -> str:
     return _call_command_with_output("update_details_from_vmp", calls)
 
 
-def update_stock_from_vmp(stores: int) -> str:
-    return _call_command_with_output("update_stock_from_vmp", stores)
+def update_stock_from_vmp(
+    stores: int,
+    store_delay: float | None = None,
+    request_delay_min: float | None = None,
+    request_delay_max: float | None = None,
+) -> str:
+    kwargs = {
+        k: v
+        for k, v in (
+            ("store_delay", store_delay),
+            ("request_delay_min", request_delay_min),
+            ("request_delay_max", request_delay_max),
+        )
+        if v is not None
+    }
+    return _call_command_with_output("update_stock_from_vmp", stores, **kwargs)
+
+
+def diagnose_apis() -> str:
+    return _call_command_with_output("diagnose_apis")
 
 
 def update_stores_from_vmp() -> str:

@@ -1,103 +1,70 @@
 from __future__ import annotations
 
-from typing import Any
-
-import cloudscraper25
-from beers.models import ExternalAPI, Store
-from cloudscraper25 import CloudScraper
-from django.core.management.base import BaseCommand
+from beers.models import Store
+from beers.vmp import VmpClient
+from beers.vmp.commands import VmpCommand
+from beers.vmp.models import VmpStore
 
 
-class Command(BaseCommand):
+class Command(VmpCommand):
     def handle(self, *args, **options) -> None:
-        try:
-            baseurl = ExternalAPI.objects.get(name="vinmonopolet").baseurl
-        except ExternalAPI.DoesNotExist:
-            self.stdout.write(
-                self.style.ERROR("vinmonopolet external API configuration not found")
-            )
-            return
+        client = self.get_client()
+
+        store_facets = client.iter_store_facets()
+
+        self.stdout.write(f"Processing {len(store_facets)} stores...")
 
         updated = 0
         created = 0
 
-        scraper = cloudscraper25.create_scraper(
-            interpreter="nodejs",
-            browser="chrome",
-            enable_stealth=True,
-        )
-        stores_data = self._fetch_stores_list(baseurl, scraper)
-
-        self.stdout.write(f"Processing {len(stores_data)} stores...")
-
-        for store_data in stores_data:
-            result = self._process_store(baseurl, scraper, store_data)
+        for facet in store_facets:
+            if facet.code is None:
+                continue
+            result = self._process_store(client, facet.code)
             if result == "updated":
                 updated += 1
             elif result == "created":
                 created += 1
 
         self.stdout.write(
-            self.style.SUCCESS(
-                f"Updated: {updated}, Created: {created}."
-            )
+            self.style.SUCCESS(f"Updated: {updated}, Created: {created}.")
         )
 
-    def _process_store(
-        self, baseurl: str, scraper: CloudScraper, store_data: dict[str, Any]
-    ) -> str:
-        store_code = store_data["code"]
-        store_details = self._fetch_store_details(baseurl, scraper, store_code)
+    def _process_store(self, client: VmpClient, store_code: str) -> str:
+        details = client.get_store(store_code)
+        fields = self._store_fields(details)
+        if fields is None:
+            return "skipped"
 
-        try:
-            store = Store.objects.get(store_id=store_code)
-            self._update_existing_store(store, store_details)
-            return "updated"
-
-        except Store.DoesNotExist:
-            self._create_new_store(store_code, store_details)
-            return "created"
-
-    def _fetch_stores_list(
-        self, baseurl: str, scraper: CloudScraper
-    ) -> list[dict[str, Any]]:
-        url = f"{baseurl}products/search?currentPage=0&fields=FULL&pageSize=1&q="
-        response = scraper.get(url, headers={"Accept": "application/json"}).json()
-
-        for facet in response.get("facets", []):
-            if facet.get("code") == "availableInStores":
-                return facet.get("values", [])
-
-        raise ValueError("No 'availableInStores' facet found in API response")
-
-    def _fetch_store_details(
-        self, baseurl: str, scraper: CloudScraper, store_code: str
-    ) -> dict[str, Any]:
-        detail_url = f"{baseurl}stores/{store_code}"
-        return scraper.get(
-            detail_url, headers={"Accept": "application/json"}
-        ).json()
-
-    def _update_existing_store(
-        self, store: Store, store_details: dict[str, Any]
-    ) -> None:
-        store.name = store_details["displayName"]
-        store.address = store_details["address"]["line1"]
-        store.zipcode = store_details["address"]["postalCode"]
-        store.area = store_details["address"]["town"]
-        store.category = store_details["assortment"]
-        store.gps_lat = store_details["geoPoint"]["latitude"]
-        store.gps_long = store_details["geoPoint"]["longitude"]
-        store.save()
-
-    def _create_new_store(self, store_code: str, store_details: dict[str, Any]) -> None:
-        Store.objects.create(
-            store_id=store_code,
-            name=store_details["displayName"],
-            address=store_details["address"]["line1"],
-            zipcode=store_details["address"]["postalCode"],
-            area=store_details["address"]["town"],
-            category=store_details["assortment"],
-            gps_lat=store_details["geoPoint"]["latitude"],
-            gps_long=store_details["geoPoint"]["longitude"],
+        _, created = Store.objects.update_or_create(
+            store_id=int(store_code), defaults=fields
         )
+        return "created" if created else "updated"
+
+    def _store_fields(self, details: VmpStore) -> dict | None:
+        address = details.address.line1
+        zipcode = details.address.postal_code
+        area = details.address.town
+        category = details.assortment
+        gps_lat = details.geo_point.latitude
+        gps_long = details.geo_point.longitude
+
+        if (
+            address is None
+            or zipcode is None
+            or area is None
+            or category is None
+            or gps_lat is None
+            or gps_long is None
+        ):
+            return None
+
+        return {
+            "name": details.display_name,
+            "address": address,
+            "zipcode": int(zipcode),
+            "area": area,
+            "category": category,
+            "gps_lat": gps_lat,
+            "gps_long": gps_long,
+        }

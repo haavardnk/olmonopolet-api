@@ -1,26 +1,15 @@
 from __future__ import annotations
 
-from typing import Any
-
-import cloudscraper25
-from beers.api.utils import get_or_create_country
-from beers.models import Beer, ExternalAPI, VmpNotReleased
-from django.core.management.base import BaseCommand
-from django.utils import timezone
+from beers.models import Beer, VmpNotReleased
+from beers.vmp import VmpApiError
+from beers.vmp.commands import VmpCommand, apply_product_fields
+from beers.vmp.models import VmpProduct
+from django.core.management.base import CommandError
 
 
-class Command(BaseCommand):
+class Command(VmpCommand):
     def handle(self, *args, **options) -> None:
-        try:
-            baseurl = ExternalAPI.objects.get(name="vinmonopolet_v3").baseurl
-        except ExternalAPI.DoesNotExist:
-            self.stdout.write(
-                self.style.ERROR("vinmonopolet_v3 external API configuration not found")
-            )
-            return
-
-        updated = 0
-        created = 0
+        client = self.get_client()
 
         products = VmpNotReleased.objects.all()
 
@@ -30,18 +19,22 @@ class Command(BaseCommand):
 
         self.stdout.write(f"Processing {products.count()} unreleased products...")
 
-        scraper = cloudscraper25.create_scraper(
-            interpreter="nodejs",
-            browser="chrome",
-            enable_stealth=True,
-        )
+        updated = 0
+        created = 0
+        failed = 0
 
         for product in products:
-            was_updated, was_created = self._process_product(product, baseurl, scraper)
-            if was_updated:
+            try:
+                detail = client.get_product(product.id)
+            except VmpApiError:
+                failed += 1
+                continue
+
+            if self._save_beer(detail):
                 updated += 1
-            elif was_created:
+            else:
                 created += 1
+            product.delete()
 
         self.stdout.write(
             self.style.SUCCESS(
@@ -49,88 +42,20 @@ class Command(BaseCommand):
             )
         )
 
-    def _process_product(
-        self,
-        product: VmpNotReleased,
-        baseurl: str,
-        scraper: cloudscraper25.CloudScraper,
-    ) -> tuple[bool, bool]:
-        url = f"{baseurl}products/{product.id}"
-        response = self._call_api(url, scraper)
+        if failed and updated + created == 0:
+            raise CommandError(
+                f"All {failed} unreleased lookups failed (vinmonopolet unreachable)"
+            )
 
+    def _save_beer(self, product: VmpProduct) -> bool:
+        code = int(product.code)
         try:
-            beer = Beer.objects.get(vmp_id=int(response["code"]))
-            self._update_existing_beer(beer, response)
-            product.delete()
-            return True, False
-
+            beer = Beer.objects.get(vmp_id=code)
+            is_update = True
         except Beer.DoesNotExist:
-            self._create_new_beer(response)
-            product.delete()
-            return False, True
+            beer = Beer(vmp_id=code)
+            is_update = False
 
-    def _update_existing_beer(self, beer: Beer, response: dict[str, Any]) -> None:
-        beer.vmp_name = response["name"]
-        beer.main_category = response["main_category"]["name"]
-
-        if "main_sub_category" in response:
-            beer.sub_category = response["main_sub_category"]["name"]
-
-        beer.country = get_or_create_country(response["main_country"]["name"])
-        beer.volume = float(response["volume"]["value"]) / 100.0
-
-        if "price" in response:
-            price_value = response["price"]["value"]
-            volume_value = float(response["volume"]["value"])
-            beer.price = price_value
-            beer.price_per_volume = self._calculate_price_per_volume(
-                price_value, volume_value
-            )
-
-        beer.product_selection = response["product_selection"]
-        beer.vmp_url = f"https://www.vinmonopolet.no{response['url']}"
-        beer.vmp_updated = timezone.now()
-
-        if not beer.active:
-            beer.active = True
-
+        apply_product_fields(beer, product)
         beer.save()
-
-    def _create_new_beer(self, response: dict[str, Any]) -> Beer:
-        volume_value = float(response["volume"]["value"])
-
-        beer_data = {
-            "vmp_id": int(response["code"]),
-            "vmp_name": response["name"],
-            "main_category": response["main_category"]["name"],
-            "country": get_or_create_country(response["main_country"]["name"]),
-            "volume": volume_value / 100.0,
-            "product_selection": response["product_selection"],
-            "vmp_url": f"https://www.vinmonopolet.no{response['url']}",
-            "vmp_updated": timezone.now(),
-        }
-
-        beer = Beer.objects.create(**beer_data)
-        if "main_sub_category" in response:
-            beer.sub_category = response["main_sub_category"]["name"]
-
-        if "price" in response:
-            price_value = response["price"]["value"]
-            beer.price = price_value
-            beer.price_per_volume = self._calculate_price_per_volume(
-                price_value, volume_value
-            )
-
-        beer.save()
-        return beer
-
-    def _call_api(
-        self, url: str, scraper: cloudscraper25.CloudScraper
-    ) -> dict[str, Any]:
-        return scraper.get(
-            url, timeout=30, headers={"Accept": "application/json"}
-        ).json()
-
-    def _calculate_price_per_volume(self, price: float, volume_value: float) -> float:
-        volume_in_liters = volume_value / 100.0
-        return price / volume_in_liters
+        return is_update

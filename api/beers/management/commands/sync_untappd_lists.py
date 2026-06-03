@@ -6,7 +6,7 @@ from argparse import ArgumentParser
 import cloudscraper25
 from beers.models import UntappdList
 from beers.untappd_lists import sync_untappd_list
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 
 
 class Command(BaseCommand):
@@ -31,6 +31,7 @@ class Command(BaseCommand):
 
         scraper = cloudscraper25.create_scraper()
         total_synced = 0
+        failed = 0
 
         for untappd_list in lists:
             self.stdout.write(
@@ -41,13 +42,16 @@ class Command(BaseCommand):
                 total_synced += 1
                 self.stdout.write(f"  Found {count} beers")
             except Exception as e:
-                self.stdout.write(
-                    self.style.ERROR(f"  Failed: {e}")
-                )
+                self.stdout.write(self.style.ERROR(f"  Failed: {e}"))
                 if "not found" in str(e) or "private" in str(e):
                     untappd_list.active = False
                     untappd_list.save(update_fields=["active"])
                     self.stdout.write("  Marked inactive")
+                else:
+                    failed += 1
 
         summary = json.dumps({"synced": total_synced, "total": lists.count()})
         self.stdout.write(summary)
+
+        if failed and total_synced == 0:
+            raise CommandError(f"All {failed} list syncs failed (untappd unreachable)")
