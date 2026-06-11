@@ -15,6 +15,9 @@ TESTING = "pytest" in sys.modules
 DEFAULT_AUTO_FIELD = "django.db.models.AutoField"
 
 VMP_PROXY = os.getenv("VMP_PROXY")
+REDIS_URL = os.getenv("REDIS_URL")
+REDIS_CACHE_URL = os.getenv("REDIS_CACHE_URL", REDIS_URL)
+REDIS_Q_URL = os.getenv("REDIS_Q_URL", REDIS_URL)
 
 firebase_creds_json = os.getenv("FIREBASE_CREDENTIALS_JSON")
 if firebase_creds_json and not firebase_admin._apps:
@@ -152,9 +155,26 @@ REST_FRAMEWORK = {
 }
 
 
+if REDIS_CACHE_URL:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.redis.RedisCache",
+            "LOCATION": REDIS_CACHE_URL,
+            "KEY_PREFIX": "beerapi",
+            "TIMEOUT": 60 * 15,
+        }
+    }
+else:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "beerapi-local",
+        }
+    }
+
+
 Q_CLUSTER = {
     "name": "beerapi",
-    "orm": "default",
     "timeout": 3600,
     "retry": 4000,
     "save_limit": 50,
@@ -172,6 +192,11 @@ Q_CLUSTER = {
         }
     },
 }
+
+if REDIS_Q_URL:
+    Q_CLUSTER["redis"] = REDIS_Q_URL
+else:
+    Q_CLUSTER["orm"] = "default"
 
 
 NOTEBOOK_ARGUMENTS = [

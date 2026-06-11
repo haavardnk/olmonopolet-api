@@ -37,6 +37,7 @@ dependencies = [
     "pyjwt>=2.9.0",
     "pytest-django>=4.9.0",
     "pytest>=9.0.1",
+    "redis>=5.0",
     "responses>=0.25.3",
     "ruff>=0.14.7",
     "sentry-sdk>=2.46.0",

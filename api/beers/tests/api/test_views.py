@@ -3,6 +3,7 @@ import io
 import pytest
 from beers.models import (
     Badge,
+    Release,
     Stock,
     Tasted,
     UntappdRssFeed,
@@ -17,8 +18,14 @@ from beers.tests.factories import (
     StoreFactory,
     UserFactory,
 )
+from django.core.cache import cache
 from django.utils import timezone
 from rest_framework.test import APIClient
+
+
+@pytest.fixture(autouse=True)
+def clear_cache() -> None:
+    cache.clear()
 
 
 @pytest.fixture
@@ -138,6 +145,26 @@ class TestCountryViewSet:
         assert "Norway" in names
         assert "Sweden" in names
         assert "Finland" not in names
+
+
+@pytest.mark.django_db
+class TestReleaseViewSet:
+    def test_release_list_is_cached(self) -> None:
+        client = APIClient()
+        release = Release.objects.create(name="Release Test")
+        release.beer.add(BeerFactory(main_category="Øl"))
+
+        first_response = client.get("/release/")
+        assert first_response.data["results"][0]["beer_count"] == 1
+
+        release.beer.add(BeerFactory(main_category="Øl"))
+
+        cached_response = client.get("/release/")
+        assert cached_response.data["results"][0]["beer_count"] == 1
+
+        cache.clear()
+        fresh_response = client.get("/release/")
+        assert fresh_response.data["results"][0]["beer_count"] == 2
 
 
 @pytest.mark.django_db

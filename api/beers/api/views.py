@@ -71,6 +71,8 @@ from rest_framework.renderers import BrowsableAPIRenderer
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
+PUBLIC_CACHE_SECONDS = 60 * 15
+
 
 class BrowsableMixin:
     def get_renderers(self) -> list:
@@ -266,7 +268,7 @@ class WrongMatchViewSet(BrowsableMixin, ModelViewSet):
     permission_classes = [permissions.AllowAny]
 
 
-@method_decorator(cache_page(60 * 5), name="dispatch")
+@method_decorator(cache_page(PUBLIC_CACHE_SECONDS), name="dispatch")
 class ReleaseViewSet(BrowsableMixin, ModelViewSet):
     serializer_class = ReleaseSerializer
     pagination_class = Pagination
@@ -314,6 +316,7 @@ class ReleaseViewSet(BrowsableMixin, ModelViewSet):
         return Response(list(styles))
 
 
+@method_decorator(cache_page(PUBLIC_CACHE_SECONDS), name="dispatch")
 class CountryViewSet(BrowsableMixin, ModelViewSet):
     queryset = Country.objects.all().order_by("name")
     serializer_class = CountrySerializer
@@ -363,7 +366,7 @@ class UserListViewSet(BrowsableMixin, ModelViewSet):
         )
 
     def get_serializer_context(self):
-        context = super().get_serializer_context()
+        context = dict(super().get_serializer_context())
         if self.action == "retrieve":
             context["include_items"] = True
         return context
@@ -379,7 +382,8 @@ class UserListViewSet(BrowsableMixin, ModelViewSet):
         owned = self.get_queryset()
         context = self.get_serializer_context()
         owned_data = [
-            dict(item) for item in UserListSerializer(owned, many=True, context=context).data
+            dict(item)
+            for item in UserListSerializer(owned, many=True, context=context).data
         ]
 
         followed_entries = FollowedList.objects.filter(user=request.user)
