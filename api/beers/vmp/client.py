@@ -23,6 +23,7 @@ _HEADERS = {"Accept": "application/json"}
 _TIMEOUT = 30
 _RETRIES = 3
 _STORE_FACET = "availableInStores"
+_SEARCH_FIELDS = "DEFAULT"
 _DEFAULT_DELAY = (1.0, 3.0)
 _IMPERSONATE = "chrome"
 _BLOCK_STATUSES = frozenset({403, 429, 503})
@@ -95,7 +96,7 @@ class VmpClient:
         query = self._build_query(category, sub_category, store_id, sort)
         return (
             f"{self._v2}products/search?currentPage={page}"
-            f"&fields=FULL&pageSize={page_size}&q={query}"
+            f"&fields={_SEARCH_FIELDS}&pageSize={page_size}&q={query}"
         )
 
     def probe(self, url: str) -> tuple[int | None, str, int, str]:

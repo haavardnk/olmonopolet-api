@@ -24,7 +24,7 @@ def create_query_url(product, store_id, page):
     req_url = (
         "https://api.test.com/v4/products/search?currentPage="
         + str(page)
-        + "&fields=FULL&pageSize=100&q="
+        + "&fields=DEFAULT&pageSize=100&q="
         + query
     )
     return req_url
