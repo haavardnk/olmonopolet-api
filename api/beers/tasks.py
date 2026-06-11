@@ -17,6 +17,7 @@ def update_beers_from_vmp(
     store_delay: float | None = None,
     request_delay_min: float | None = None,
     request_delay_max: float | None = None,
+    category: str | None = None,
 ) -> str:
     kwargs = {
         k: v
@@ -24,6 +25,7 @@ def update_beers_from_vmp(
             ("store_delay", store_delay),
             ("request_delay_min", request_delay_min),
             ("request_delay_max", request_delay_max),
+            ("category", category),
         )
         if v is not None
     }

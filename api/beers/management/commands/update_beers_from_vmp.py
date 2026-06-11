@@ -13,10 +13,17 @@ from beers.vmp.commands import (
 )
 from beers.vmp.models import VmpProduct
 from django.conf import settings
+from django.core.management.base import CommandError
 
 
 class Command(VmpCommand):
     def add_arguments(self, parser: ArgumentParser) -> None:
+        parser.add_argument(
+            "--category",
+            type=str,
+            default=None,
+            help="Only process this main category (e.g. øl) to stagger the crawl",
+        )
         parser.add_argument(
             "--store-delay",
             type=float,
@@ -42,12 +49,13 @@ class Command(VmpCommand):
         )
 
         store_delay = options["store_delay"]
+        categories = self._select_categories(options["category"])
 
         updated = 0
         created = 0
         skipped = 0
 
-        for index, (category, sub_category) in enumerate(CATEGORIES):
+        for index, (category, sub_category) in enumerate(categories):
             if index and store_delay and not settings.TESTING:
                 time.sleep(store_delay)
             for product in client.iter_products(
@@ -74,6 +82,17 @@ class Command(VmpCommand):
                 f"skipped {skipped} without price!"
             )
         )
+
+    def _select_categories(self, category: str | None) -> list[tuple[str, str | None]]:
+        if category is None:
+            return CATEGORIES
+        selected = [entry for entry in CATEGORIES if entry[0] == category]
+        if not selected:
+            available = sorted({entry[0] for entry in CATEGORIES})
+            raise CommandError(
+                f"unknown category '{category}', choose from: {', '.join(available)}"
+            )
+        return selected
 
     def _save_beer(self, beer: Beer, product: VmpProduct) -> bool:
         if product.price is None:

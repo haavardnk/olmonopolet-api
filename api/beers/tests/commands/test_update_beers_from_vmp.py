@@ -6,6 +6,7 @@ from beers.models import Beer, Country, ExternalAPI
 from beers.vmp.commands import apply_product_fields, post_delivery, store_delivery
 from beers.vmp.models import VmpProduct
 from django.core.management import call_command
+from django.core.management.base import CommandError
 
 BEER_DATA = {
     "code": "9999",
@@ -135,3 +136,22 @@ class TestFullFlow:
         call_command("update_beers_from_vmp", stdout=io.StringIO())
 
         assert not Beer.objects.filter(vmp_id=9999).exists()
+
+
+class TestCategoryFilter:
+    @responses.activate
+    def test_single_category_fetches_one_category(self, db):
+        rsp = responses.add(
+            responses.GET,
+            "https://api.test.com/v2/products/search",
+            json={"products": [BEER_DATA], "pagination": {"totalPages": 1}},
+            status=200,
+        )
+
+        call_command("update_beers_from_vmp", category="øl", stdout=io.StringIO())
+
+        assert rsp.call_count == 1
+
+    def test_unknown_category_raises(self, db):
+        with pytest.raises(CommandError):
+            call_command("update_beers_from_vmp", category="brus", stdout=io.StringIO())
