@@ -1,7 +1,7 @@
 import pytest
 import responses
 from beers.models import ExternalAPI
-from beers.vmp import VmpApiError, VmpClient
+from beers.vmp import VmpApiError, VmpBlockedError, VmpClient
 
 from .test_models import DETAIL_JSON, PRODUCT_JSON, SEARCH_JSON, STORE_JSON
 
@@ -131,3 +131,28 @@ class TestFetchRetry:
 
         with pytest.raises(VmpApiError):
             client.search("øl")
+
+
+class TestBlocked:
+    @pytest.mark.parametrize("status", [403, 429, 503])
+    @responses.activate
+    def test_fetch_aborts_on_block_without_retry(self, client, status):
+        responses.add(
+            responses.GET, f"{V2}products/search", json={}, status=status
+        )
+
+        with pytest.raises(VmpBlockedError):
+            client.search("øl")
+
+        assert len(responses.calls) == 1
+
+    @responses.activate
+    def test_barcode_search_aborts_on_block(self, client):
+        responses.add(
+            responses.GET, f"{V2}products/barCodeSearch/123", json={}, status=403
+        )
+
+        with pytest.raises(VmpBlockedError):
+            client.barcode_search("123")
+
+        assert len(responses.calls) == 1

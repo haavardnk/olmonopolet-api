@@ -23,8 +23,13 @@ _HEADERS = {"Accept": "application/json"}
 _TIMEOUT = 30
 _RETRIES = 3
 _STORE_FACET = "availableInStores"
-_DEFAULT_DELAY = (0.5, 1.5)
+_DEFAULT_DELAY = (1.0, 3.0)
 _IMPERSONATE = "chrome"
+_BLOCK_STATUSES = frozenset({403, 429, 503})
+
+
+class VmpBlockedError(Exception):
+    pass
 
 
 class VmpApiError(Exception):
@@ -145,6 +150,10 @@ class VmpClient:
             if response is None:
                 self._sleep(2**attempt)
                 continue
+            if response.status_code in _BLOCK_STATUSES:
+                raise VmpBlockedError(
+                    f"blocked by vinmonopolet (HTTP {response.status_code}) ({url})"
+                )
             if response.status_code == 400:
                 return None
             if not response.ok:
@@ -174,11 +183,16 @@ class VmpClient:
         for attempt in range(_RETRIES):
             self._sleep(random.uniform(*self._delay))
             response = self._get(url)
-            if response is not None and response.ok:
-                try:
-                    return response.json()
-                except json.JSONDecodeError:
-                    pass
+            if response is not None:
+                if response.status_code in _BLOCK_STATUSES:
+                    raise VmpBlockedError(
+                        f"blocked by vinmonopolet (HTTP {response.status_code}) ({url})"
+                    )
+                if response.ok:
+                    try:
+                        return response.json()
+                    except json.JSONDecodeError:
+                        pass
             self._session = _new_session()
             self._sleep(2**attempt + random.uniform(0, 1))
         raise VmpApiError(f"no valid JSON response from vinmonopolet ({url})")
