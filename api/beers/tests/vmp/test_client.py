@@ -1,12 +1,18 @@
 import pytest
 import responses
 from beers.models import ExternalAPI
-from beers.vmp import VmpApiError, VmpBlockedError, VmpClient
+from beers.vmp import VmpApiError, VmpBlockedError, VmpClient, circuit_breaker
+from django.core.cache import cache
 
 from .test_models import DETAIL_JSON, PRODUCT_JSON, SEARCH_JSON, STORE_JSON
 
 V2 = "https://api.test.com/v2/"
 V3 = "https://api.test.com/v3/"
+
+
+@pytest.fixture(autouse=True)
+def _clear_cache() -> None:
+    cache.clear()
 
 
 @pytest.fixture
@@ -137,9 +143,7 @@ class TestBlocked:
     @pytest.mark.parametrize("status", [403, 429, 503])
     @responses.activate
     def test_fetch_aborts_on_block_without_retry(self, client, status):
-        responses.add(
-            responses.GET, f"{V2}products/search", json={}, status=status
-        )
+        responses.add(responses.GET, f"{V2}products/search", json={}, status=status)
 
         with pytest.raises(VmpBlockedError):
             client.search("øl")
@@ -156,3 +160,25 @@ class TestBlocked:
             client.barcode_search("123")
 
         assert len(responses.calls) == 1
+
+    @pytest.mark.parametrize("status", [403, 429, 503])
+    @responses.activate
+    def test_block_opens_circuit_breaker(self, client, status):
+        responses.add(responses.GET, f"{V2}products/search", json={}, status=status)
+
+        with pytest.raises(VmpBlockedError):
+            client.search("øl")
+
+        assert circuit_breaker.is_open() is True
+
+    @responses.activate
+    def test_open_breaker_skips_request(self, client):
+        circuit_breaker.open(100)
+        responses.add(
+            responses.GET, f"{V2}products/search", json=SEARCH_JSON, status=200
+        )
+
+        with pytest.raises(VmpBlockedError):
+            client.search("øl")
+
+        assert len(responses.calls) == 0

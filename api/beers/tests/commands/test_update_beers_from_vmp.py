@@ -2,11 +2,13 @@ import io
 
 import pytest
 import responses
-from beers.models import Beer, Country, ExternalAPI
+from beers.models import Beer, Country, ExternalAPI, VmpCrawlState
+from beers.vmp import circuit_breaker
 from beers.vmp.commands import apply_product_fields, post_delivery, store_delivery
 from beers.vmp.models import VmpProduct
 from django.core.management import call_command
 from django.core.management.base import CommandError
+from django.utils import timezone
 
 BEER_DATA = {
     "code": "9999",
@@ -155,3 +157,83 @@ class TestCategoryFilter:
     def test_unknown_category_raises(self, db):
         with pytest.raises(CommandError):
             call_command("update_beers_from_vmp", category="brus", stdout=io.StringIO())
+
+
+class TestBudgetAndResume:
+    @responses.activate
+    def test_budget_limits_pages_and_saves_state(self, db):
+        responses.add(
+            responses.GET,
+            "https://api.test.com/v2/products/search",
+            json={"products": [BEER_DATA], "pagination": {"totalPages": 5}},
+            status=200,
+        )
+
+        call_command("update_beers_from_vmp", max_requests=2, stdout=io.StringIO())
+
+        state = VmpCrawlState.objects.get(scope="catalog")
+        assert state.category == 0
+        assert state.page == 2
+        assert state.started is not None
+
+    @responses.activate
+    def test_resume_completes_cycle_and_resets(self, db):
+        VmpCrawlState.objects.create(
+            scope="catalog", category=5, page=0, started=timezone.now()
+        )
+        responses.add(
+            responses.GET,
+            "https://api.test.com/v2/products/search",
+            json={"products": [BEER_DATA], "pagination": {"totalPages": 1}},
+            status=200,
+        )
+
+        call_command("update_beers_from_vmp", max_requests=20, stdout=io.StringIO())
+
+        state = VmpCrawlState.objects.get(scope="catalog")
+        assert state.category == 0
+        assert state.page == 0
+        assert state.started is None
+
+    @responses.activate
+    def test_category_run_uses_separate_scope(self, db):
+        responses.add(
+            responses.GET,
+            "https://api.test.com/v2/products/search",
+            json={"products": [BEER_DATA], "pagination": {"totalPages": 1}},
+            status=200,
+        )
+
+        call_command(
+            "update_beers_from_vmp",
+            category="øl",
+            max_requests=20,
+            stdout=io.StringIO(),
+        )
+
+        assert VmpCrawlState.objects.filter(scope="category:øl").exists()
+        assert not VmpCrawlState.objects.filter(scope="catalog").exists()
+
+    def test_circuit_breaker_open_skips_run(self, db):
+        circuit_breaker.open(100)
+
+        call_command("update_beers_from_vmp", stdout=io.StringIO())
+
+        assert not Beer.objects.filter(vmp_id=9999).exists()
+
+    @responses.activate
+    def test_block_opens_breaker_and_saves_state(self, db):
+        responses.add(
+            responses.GET,
+            "https://api.test.com/v2/products/search",
+            json={},
+            status=429,
+        )
+
+        with pytest.raises(CommandError):
+            call_command("update_beers_from_vmp", stdout=io.StringIO())
+
+        assert circuit_breaker.is_open() is True
+        state = VmpCrawlState.objects.get(scope="catalog")
+        assert state.category == 0
+        assert state.page == 0

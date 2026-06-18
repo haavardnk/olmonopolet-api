@@ -24,6 +24,7 @@ from beers.models import (
     FollowedList,
     UserList,
     UserListItem,
+    VmpCrawlState,
     VmpNotReleased,
     WrongMatch,
 )
@@ -104,6 +105,11 @@ class MatchManuallyAdmin(BeerAdmin):
 class StoreAdmin(admin.ModelAdmin):
     list_display = ("name", "store_id", "address", "store_updated")
     search_fields = ("name", "store_id")
+
+
+@admin.register(VmpCrawlState)
+class VmpCrawlStateAdmin(admin.ModelAdmin):
+    list_display = ("scope", "category", "page", "started")
 
 
 @admin.register(Stock)
@@ -335,7 +341,7 @@ class UntappdRssFeedAdmin(admin.ModelAdmin):
     search_fields = ("user__username", "user__email")
     readonly_fields = ("last_synced", "created_at")
 
-
+
 @admin.register(FollowedList)
 class FollowedListAdmin(admin.ModelAdmin):
     list_display = ("user", "share_token", "created_at")

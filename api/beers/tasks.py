@@ -18,6 +18,8 @@ def update_beers_from_vmp(
     request_delay_min: float | None = None,
     request_delay_max: float | None = None,
     category: str | None = None,
+    max_requests: int | None = None,
+    circuit_breaker_cooldown: int | None = None,
 ) -> str:
     kwargs = {
         k: v
@@ -26,6 +28,8 @@ def update_beers_from_vmp(
             ("request_delay_min", request_delay_min),
             ("request_delay_max", request_delay_max),
             ("category", category),
+            ("max_requests", max_requests),
+            ("circuit_breaker_cooldown", circuit_breaker_cooldown),
         )
         if v is not None
     }
@@ -51,6 +55,8 @@ def update_stock_from_vmp(
     store_delay: float | None = None,
     request_delay_min: float | None = None,
     request_delay_max: float | None = None,
+    max_requests: int | None = None,
+    circuit_breaker_cooldown: int | None = None,
 ) -> str:
     kwargs = {
         k: v
@@ -58,6 +64,8 @@ def update_stock_from_vmp(
             ("store_delay", store_delay),
             ("request_delay_min", request_delay_min),
             ("request_delay_max", request_delay_max),
+            ("max_requests", max_requests),
+            ("circuit_breaker_cooldown", circuit_breaker_cooldown),
         )
         if v is not None
     }

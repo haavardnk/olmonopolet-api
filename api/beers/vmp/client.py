@@ -11,6 +11,7 @@ from curl_cffi.requests.exceptions import RequestException
 from django.conf import settings
 
 from beers.models import ExternalAPI
+from beers.vmp import circuit_breaker
 from beers.vmp.models import (
     FacetValue,
     SearchResponse,
@@ -145,6 +146,8 @@ class VmpClient:
 
     def barcode_search(self, gtin: str) -> VmpProduct | None:
         url = f"{self._v2}products/barCodeSearch/{gtin}"
+        if circuit_breaker.is_open():
+            raise VmpBlockedError("vinmonopolet circuit breaker open")
         for attempt in range(_RETRIES):
             self._sleep(random.uniform(*self._delay))
             response = self._get(url)
@@ -152,6 +155,7 @@ class VmpClient:
                 self._sleep(2**attempt)
                 continue
             if response.status_code in _BLOCK_STATUSES:
+                circuit_breaker.open()
                 raise VmpBlockedError(
                     f"blocked by vinmonopolet (HTTP {response.status_code}) ({url})"
                 )
@@ -181,11 +185,14 @@ class VmpClient:
         return query
 
     def _fetch(self, url: str) -> dict:
+        if circuit_breaker.is_open():
+            raise VmpBlockedError("vinmonopolet circuit breaker open")
         for attempt in range(_RETRIES):
             self._sleep(random.uniform(*self._delay))
             response = self._get(url)
             if response is not None:
                 if response.status_code in _BLOCK_STATUSES:
+                    circuit_breaker.open()
                     raise VmpBlockedError(
                         f"blocked by vinmonopolet (HTTP {response.status_code}) ({url})"
                     )

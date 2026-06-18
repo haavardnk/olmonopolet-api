@@ -202,6 +202,10 @@ class Store(models.Model):
     store_updated = models.DateTimeField(auto_now=True)
     store_stock_updated = models.DateTimeField(blank=True, null=True)
 
+    stock_sync_started = models.DateTimeField(blank=True, null=True)
+    stock_sync_category = models.IntegerField(default=0)
+    stock_sync_page = models.IntegerField(default=0)
+
     def __str__(self):
         return self.name
 
@@ -212,6 +216,7 @@ class Stock(models.Model):
     quantity = models.IntegerField()
 
     stock_updated = models.DateTimeField(auto_now=True)
+    last_seen_in_stock_sync = models.DateTimeField(blank=True, null=True)
     stocked_at = models.DateTimeField(blank=True, null=True)
     unstocked_at = models.DateTimeField(blank=True, null=True)
 
@@ -220,6 +225,16 @@ class Stock(models.Model):
 
     def __str__(self):
         return self.beer.vmp_name
+
+
+class VmpCrawlState(models.Model):
+    scope = models.CharField(max_length=50, primary_key=True, default="catalog")
+    category = models.IntegerField(default=0)
+    page = models.IntegerField(default=0)
+    started = models.DateTimeField(blank=True, null=True)
+
+    def __str__(self):
+        return self.scope
 
 
 class WrongMatch(models.Model):
