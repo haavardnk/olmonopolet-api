@@ -28,8 +28,7 @@ class TestValueScore:
 
     def test_high_rating_low_ppv(self) -> None:
         beer = BeerFactory.build(rating=4.5, price_per_volume=100.0)
-        expected = ((4.5 - 1.5) / 3.3) ** 3 * 28 / (100.0 / 250) ** 0.30
-        assert beer._compute_value_score() == pytest.approx(expected)
+        assert beer._compute_value_score() == pytest.approx(20.0)
 
 
 @pytest.mark.django_db
