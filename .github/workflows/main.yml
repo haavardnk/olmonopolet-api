@@ -37,7 +37,7 @@ jobs:
       - name: Install the project
         run: uv sync --all-extras --dev
       - name: Run tests
-        working-directory: ./api
+        working-directory: ./src
         run: |
           uv run pytest -n auto
 

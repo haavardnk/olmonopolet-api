@@ -34,7 +34,7 @@ DEBUG_VALUE=1
 ### Run
 
 ```bash
-cd api
+cd src
 uv run python manage.py migrate
 uv run python manage.py runserver
 ```

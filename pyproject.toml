@@ -46,20 +46,20 @@ dependencies = [
 ]
 
 [tool.pyrefly]
-search_path = ["api"]
+search_path = ["src"]
 
 [[tool.pyrefly.sub-config]]
-matches = "api/beers/api/serializers.py"
+matches = "src/beers/api/serializers.py"
 [tool.pyrefly.sub-config.errors]
 bad-override = false
 
 [[tool.pyrefly.sub-config]]
-matches = "api/beers/tests/factories.py"
+matches = "src/beers/tests/factories.py"
 [tool.pyrefly.sub-config.errors]
 bad-override = false
 
 [[tool.pyrefly.sub-config]]
-matches = "api/beers/tests/**"
+matches = "src/beers/tests/**"
 [tool.pyrefly.sub-config.errors]
 bad-assignment = false
 bad-argument-type = false
