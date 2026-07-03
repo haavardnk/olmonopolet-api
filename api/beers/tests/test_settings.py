@@ -4,7 +4,7 @@ import importlib
 
 import pytest
 
-import api.settings as project_settings
+import config.settings as project_settings
 
 
 def test_no_redis_env_uses_local_cache(monkeypatch: pytest.MonkeyPatch) -> None:
