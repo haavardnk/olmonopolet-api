@@ -45,7 +45,9 @@ from beers.models import (
     WrongMatch,
 )
 from beers.untappd_lists import fetch_user_lists
+from beers.vmp import VmpApiError, VmpBlockedError, VmpClient
 from django.contrib.postgres.aggregates import ArrayAgg
+from django.core.cache import cache
 from django.db import models
 from django.db.models import (
     Case,
@@ -72,6 +74,8 @@ from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
 PUBLIC_CACHE_SECONDS = 60 * 15
+_BARCODE_HIT_TTL = 60 * 60 * 24 * 30
+_BARCODE_MISS_TTL = 60 * 60
 
 
 class BrowsableMixin:
@@ -137,6 +141,38 @@ class BeerViewSet(BrowsableMixin, ModelViewSet):
             queryset = queryset.filter(vmp_id__in=beer_ids)
 
         return queryset
+
+    @action(detail=False, methods=["get"], url_path="barcode")
+    def barcode(self, request):
+        code = (request.query_params.get("code") or "").strip()
+        if not code.isdigit():
+            return Response({"error": "A numeric barcode is required"}, status=400)
+
+        if cache.get(f"vmp_barcode_miss:{code}"):
+            return Response({"error": "No beer found for this barcode"}, status=404)
+
+        vmp_code = cache.get(f"vmp_barcode:{code}")
+        if vmp_code is None:
+            try:
+                vmp_code = VmpClient.from_external_api().barcode_search(code)
+            except VmpBlockedError:
+                return Response(
+                    {"error": "Barcode lookup temporarily unavailable"}, status=503
+                )
+            except VmpApiError:
+                return Response({"error": "Barcode lookup failed"}, status=502)
+
+            if vmp_code is None:
+                cache.set(f"vmp_barcode_miss:{code}", True, _BARCODE_MISS_TTL)
+                return Response({"error": "No beer found for this barcode"}, status=404)
+
+            cache.set(f"vmp_barcode:{code}", vmp_code, _BARCODE_HIT_TTL)
+
+        beer = self.get_queryset().filter(vmp_id=int(vmp_code)).first()
+        if beer is None:
+            return Response({"error": "No beer found for this barcode"}, status=404)
+
+        return Response(self.get_serializer(beer).data)
 
     @action(detail=False, methods=["get"], url_path="styles")
     def styles(self, request):

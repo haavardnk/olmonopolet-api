@@ -1,4 +1,5 @@
 import io
+from unittest.mock import patch
 
 import pytest
 from beers.models import (
@@ -18,6 +19,7 @@ from beers.tests.factories import (
     StoreFactory,
     UserFactory,
 )
+from beers.vmp import VmpApiError, VmpBlockedError
 from django.core.cache import cache
 from django.utils import timezone
 from rest_framework.test import APIClient
@@ -520,3 +522,80 @@ class TestSharedUserListSerializer:
         client = APIClient()
         response = client.get(f"/lists/shared/{user_list.share_token}/")
         assert response.data["store_name"] == "My Store"
+
+
+@pytest.mark.django_db
+class TestBarcodeLookup:
+    def test_match_returns_beer(self) -> None:
+        client = APIClient()
+        beer = BeerFactory(vmp_id=3246802)
+        with patch("beers.api.views.VmpClient.from_external_api") as mock_factory:
+            mock_factory.return_value.barcode_search.return_value = "3246802"
+            response = client.get("/beers/barcode/?code=5410908000036")
+        assert response.status_code == 200
+        assert response.data["vmp_id"] == beer.vmp_id
+
+    def test_vmp_no_match_returns_404(self) -> None:
+        client = APIClient()
+        with patch("beers.api.views.VmpClient.from_external_api") as mock_factory:
+            mock_factory.return_value.barcode_search.return_value = None
+            response = client.get("/beers/barcode/?code=5410908000036")
+        assert response.status_code == 404
+
+    def test_vmp_match_but_no_local_beer_returns_404(self) -> None:
+        client = APIClient()
+        with patch("beers.api.views.VmpClient.from_external_api") as mock_factory:
+            mock_factory.return_value.barcode_search.return_value = "3246802"
+            response = client.get("/beers/barcode/?code=5410908000036")
+        assert response.status_code == 404
+
+    @pytest.mark.parametrize(
+        "code", ["", "abc", "12x34"], ids=["empty", "alpha", "mixed"]
+    )
+    def test_invalid_code_returns_400(self, code: str) -> None:
+        client = APIClient()
+        response = client.get(f"/beers/barcode/?code={code}")
+        assert response.status_code == 400
+
+    def test_blocked_returns_503(self) -> None:
+        client = APIClient()
+        with patch("beers.api.views.VmpClient.from_external_api") as mock_factory:
+            mock_factory.return_value.barcode_search.side_effect = VmpBlockedError()
+            response = client.get("/beers/barcode/?code=5410908000036")
+        assert response.status_code == 503
+
+    def test_api_error_returns_502(self) -> None:
+        client = APIClient()
+        with patch("beers.api.views.VmpClient.from_external_api") as mock_factory:
+            mock_factory.return_value.barcode_search.side_effect = VmpApiError()
+            response = client.get("/beers/barcode/?code=5410908000036")
+        assert response.status_code == 502
+
+    def test_positive_result_is_cached(self) -> None:
+        client = APIClient()
+        BeerFactory(vmp_id=3246802)
+        with patch("beers.api.views.VmpClient.from_external_api") as mock_factory:
+            search = mock_factory.return_value.barcode_search
+            search.return_value = "3246802"
+            client.get("/beers/barcode/?code=5410908000036")
+            client.get("/beers/barcode/?code=5410908000036")
+            assert search.call_count == 1
+
+    def test_negative_result_is_cached(self) -> None:
+        client = APIClient()
+        with patch("beers.api.views.VmpClient.from_external_api") as mock_factory:
+            search = mock_factory.return_value.barcode_search
+            search.return_value = None
+            client.get("/beers/barcode/?code=5410908000036")
+            client.get("/beers/barcode/?code=5410908000036")
+            assert search.call_count == 1
+
+    def test_fields_param_trims_payload(self) -> None:
+        client = APIClient()
+        BeerFactory(vmp_id=3246802)
+        with patch("beers.api.views.VmpClient.from_external_api") as mock_factory:
+            mock_factory.return_value.barcode_search.return_value = "3246802"
+            response = client.get(
+                "/beers/barcode/?code=5410908000036&fields=vmp_id,vmp_name"
+            )
+        assert set(response.data.keys()) == {"vmp_id", "vmp_name"}

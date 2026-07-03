@@ -116,10 +116,9 @@ class TestBarcodeSearch:
             status=200,
         )
 
-        product = client.barcode_search("123")
+        code = client.barcode_search("123")
 
-        assert product is not None
-        assert product.code == "1234"
+        assert code == "1234"
 
     @responses.activate
     def test_not_found_returns_none(self, client):

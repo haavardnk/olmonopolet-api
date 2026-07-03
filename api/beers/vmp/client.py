@@ -144,7 +144,7 @@ class VmpClient:
                 return facet.values
         raise VmpApiError(f"no '{_STORE_FACET}' facet in vinmonopolet response")
 
-    def barcode_search(self, gtin: str) -> VmpProduct | None:
+    def barcode_search(self, gtin: str) -> str | None:
         url = f"{self._v2}products/barCodeSearch/{gtin}"
         if circuit_breaker.is_open():
             raise VmpBlockedError("vinmonopolet circuit breaker open")
@@ -165,9 +165,11 @@ class VmpClient:
                 self._sleep(2**attempt)
                 continue
             try:
-                return VmpProduct.model_validate(response.json())
+                code = response.json().get("code")
             except json.JSONDecodeError:
                 self._sleep(2**attempt)
+                continue
+            return str(code) if code else None
         raise VmpApiError(f"no valid response from vinmonopolet for barcode {gtin}")
 
     def _build_query(
