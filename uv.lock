@@ -239,7 +239,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "beautifulsoup4", specifier = ">=4.14.3" },
-    { name = "blessed", specifier = ">=1.25.0" },
+    { name = "blessed", specifier = ">=1.46.0" },
     { name = "cloudscraper25", specifier = ">=2.7.0" },
     { name = "cryptography", specifier = ">=43.0.3" },
     { name = "curl-cffi", specifier = ">=0.15.0" },
@@ -309,15 +309,15 @@ css = [
 
 [[package]]
 name = "blessed"
-version = "1.45.0"
+version = "1.46.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "jinxed" },
     { name = "wcwidth" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/96/5b/ef31e677f49cce9699070c4c1a2f0ccc297d24f88aab6dfd1f5b4b17d92e/blessed-1.45.0.tar.gz", hash = "sha256:d12abbbcfb5fdd80bac33ea7e22f1a163ff462f5c05f312159e04c5fee460c72", size = 14032801, upload-time = "2026-06-29T18:47:09.661Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/04/ad/ff81f81dc9ed2efbeab4cdecda9f551834429d737ac40c3847b2b1200002/blessed-1.46.0.tar.gz", hash = "sha256:171ee6775a9be86bb000f2e22034c08f76851feb60934a2922feeaff43d0fa60", size = 14034378, upload-time = "2026-07-03T23:43:09.944Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/75/50/23322f1484a90caec587d6d3734f9ef3a445b45104148201524a4ff70adb/blessed-1.45.0-py3-none-any.whl", hash = "sha256:afcc23a07e965534dd4669951d2397397dbece46e18998eee9d24d40ac503765", size = 130447, upload-time = "2026-06-29T18:47:07.373Z" },
+    { url = "https://files.pythonhosted.org/packages/65/8f/c10d44ba50d5d298699c3c5698ce4e89b397ec72e2139381b9964f87356c/blessed-1.46.0-py3-none-any.whl", hash = "sha256:558334e2456300332cff9f2b211656cd3eecd3f56a5b1ee5f6110ed83c28e25d", size = 130757, upload-time = "2026-07-03T23:43:07.598Z" },
 ]
 
 [[package]]
@@ -2059,7 +2059,7 @@ name = "pexpect"
 version = "4.9.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "ptyprocess" },
+    { name = "ptyprocess", marker = "sys_platform != 'emscripten' and sys_platform != 'win32'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/42/92/cc564bf6381ff43ce1f4d06852fc19a2f11d180f23dc32d9588bee2f149d/pexpect-4.9.0.tar.gz", hash = "sha256:ee7d41123f3c9911050ea2c2dac107568dc43b2d3b0c7557a33212c398ead30f", size = 166450, upload-time = "2023-11-25T09:07:26.339Z" }
 wheels = [
