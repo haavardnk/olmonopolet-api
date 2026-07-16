@@ -22,6 +22,7 @@ from beers.tests.factories import (
 from beers.vmp import VmpApiError, VmpBlockedError
 from django.core.cache import cache
 from django.utils import timezone
+from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient
 
 
@@ -599,3 +600,30 @@ class TestBarcodeLookup:
                 "/beers/barcode/?code=5410908000036&fields=vmp_id,vmp_name"
             )
         assert set(response.data.keys()) == {"vmp_id", "vmp_name"}
+
+
+@pytest.mark.django_db
+class TestExtensionTokenView:
+    def test_get_creates_and_returns_token(self, auth_client: tuple) -> None:
+        client, user = auth_client
+        response = client.get("/auth/extension-token/")
+        assert response.status_code == 200
+        assert response.data["token"] == Token.objects.get(user=user).key
+
+    def test_get_is_idempotent(self, auth_client: tuple) -> None:
+        client, _user = auth_client
+        first = client.get("/auth/extension-token/").data["token"]
+        second = client.get("/auth/extension-token/").data["token"]
+        assert first == second
+
+    def test_delete_revokes_token(self, auth_client: tuple) -> None:
+        client, user = auth_client
+        client.get("/auth/extension-token/")
+        response = client.delete("/auth/extension-token/")
+        assert response.status_code == 204
+        assert not Token.objects.filter(user=user).exists()
+
+    def test_unauthenticated_returns_401(self) -> None:
+        client = APIClient()
+        response = client.get("/auth/extension-token/")
+        assert response.status_code in (401, 403)

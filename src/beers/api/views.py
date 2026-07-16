@@ -68,9 +68,11 @@ from django.views.decorators.cache import cache_page
 from django_filters.rest_framework import DjangoFilterBackend
 from django_q.tasks import async_task
 from rest_framework import filters, permissions
+from rest_framework.authtoken.models import Token
 from rest_framework.decorators import action
 from rest_framework.renderers import BrowsableAPIRenderer
 from rest_framework.response import Response
+from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet
 
 PUBLIC_CACHE_SECONDS = 60 * 15
@@ -744,3 +746,19 @@ class UntappdRssFeedViewSet(BrowsableMixin, ModelViewSet):
             summary.pop("users_affected", None)
             return Response(summary)
         return Response({"imported": 0, "synced": 0})
+
+
+class ExtensionTokenView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        token, _ = Token.objects.get_or_create(user=request.user)
+        return Response({"token": token.key})
+
+    def post(self, request):
+        token, _ = Token.objects.get_or_create(user=request.user)
+        return Response({"token": token.key})
+
+    def delete(self, request):
+        Token.objects.filter(user=request.user).delete()
+        return Response(status=204)
