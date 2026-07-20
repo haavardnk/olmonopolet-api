@@ -35,6 +35,7 @@ class UntappdListInfo:
 
 def fetch_user_lists(username: str) -> list[UntappdListInfo]:
     scraper = cloudscraper25.create_scraper()
+    _inject_session_cookies(scraper)
     url = f"{UNTAPPD_BASE}/user/{username}/lists"
     resp = scraper.get(url, timeout=30)
 
@@ -42,6 +43,11 @@ def fetch_user_lists(username: str) -> list[UntappdListInfo]:
         raise ValueError(f"Untappd user '{username}' not found")
     if "set their account to be private" in resp.text:
         raise ValueError(f"Untappd user '{username}' has a private profile")
+    if 'action="login"' in resp.text or "/login" in resp.url:
+        exc = UntappdCookieExpired("Untappd session cookie has expired")
+        sentry_sdk.capture_exception(exc)
+        logger.warning("Untappd cookie expired during user lists fetch")
+        raise exc
 
     resp.raise_for_status()
     soup = BeautifulSoup(resp.text, "html.parser")
@@ -64,9 +70,7 @@ def _parse_user_lists_page(soup: BeautifulSoup) -> list[UntappdListInfo]:
 
         wishlist_link = item.select_one("a[href*='/wishlist']")
         if wishlist_link:
-            results.append(
-                UntappdListInfo(list_id=0, name=name, item_count=count)
-            )
+            results.append(UntappdListInfo(list_id=0, name=name, item_count=count))
             continue
 
         link = item.select_one("a[href*='/lists/']")
@@ -180,7 +184,7 @@ def _fetch_initial_page_ids(
         return []
     if "set their account to be private" in resp.text:
         return None
-    if "action=\"login\"" in resp.text or "/login" in resp.url:
+    if 'action="login"' in resp.text or "/login" in resp.url:
         exc = UntappdCookieExpired("Untappd session cookie has expired")
         sentry_sdk.capture_exception(exc)
         logger.warning("Untappd cookie expired during list fetch")
@@ -191,7 +195,7 @@ def _fetch_initial_page_ids(
 def _parse_beer_ids_from_html(html: str, list_id: int) -> list[int]:
     soup = BeautifulSoup(html, "html.parser")
     beer_ids: list[int] = []
-    for link in soup.select("a[href*='/b/']"): 
+    for link in soup.select("a[href*='/b/']"):
         href = str(link.get("href", ""))
         m = re.search(r"/b/[^/]+/(\d+)", href)
         if m:
