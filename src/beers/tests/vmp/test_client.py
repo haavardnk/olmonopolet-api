@@ -121,12 +121,14 @@ class TestBarcodeSearch:
         assert code == "1234"
 
     @responses.activate
-    def test_not_found_returns_none(self, client):
+    @pytest.mark.parametrize("status", [400, 404])
+    def test_not_found_returns_none(self, client, status):
         responses.add(
-            responses.GET, f"{V2}products/barCodeSearch/123", json={}, status=400
+            responses.GET, f"{V2}products/barCodeSearch/123", json={}, status=status
         )
 
         assert client.barcode_search("123") is None
+        assert len(responses.calls) == 1
 
 
 class TestFetchRetry:

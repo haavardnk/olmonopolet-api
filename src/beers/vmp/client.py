@@ -159,7 +159,7 @@ class VmpClient:
                 raise VmpBlockedError(
                     f"blocked by vinmonopolet (HTTP {response.status_code}) ({url})"
                 )
-            if response.status_code == 400:
+            if response.status_code in (400, 404):
                 return None
             if not response.ok:
                 self._sleep(2**attempt)
