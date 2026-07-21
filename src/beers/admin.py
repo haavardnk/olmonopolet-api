@@ -7,6 +7,7 @@ from django.db import models
 from django.db.models import Count, QuerySet
 from django.db.models.functions import Cast
 from django.http import HttpRequest
+from django.utils.html import format_html
 
 from beers.models import (
     Badge,
@@ -65,12 +66,34 @@ class TastedInline(admin.TabularInline):
     raw_id_fields = ("beer",)
 
 
+class BeerBreweryInline(admin.TabularInline):
+    model = Beer
+    fk_name = "brewery"
+    extra = 0
+    can_delete = False
+    fields = ("label_sm_preview", "vmp_name", "untpd_name", "rating")
+    readonly_fields = ("label_sm_preview", "vmp_name", "untpd_name", "rating")
+    show_change_link = True
+
+    def has_add_permission(
+        self, request: HttpRequest, obj: Brewery | None = None
+    ) -> bool:
+        return False
+
+    @admin.display(description="Logo")
+    def label_sm_preview(self, obj: Beer) -> str:
+        if not obj.label_sm_url:
+            return "\u2014"
+        return format_html('<img src="{}" style="height:40px;" />', obj.label_sm_url)
+
+
 @admin.register(Beer)
 class BeerAdmin(admin.ModelAdmin):
     list_display = (
         "vmp_name",
         "main_category",
         "untpd_name",
+        "label_preview",
         "vmp_id",
         "untpd_id",
         "rating",
@@ -83,6 +106,7 @@ class BeerAdmin(admin.ModelAdmin):
     )
     list_editable = ("match_manually", "active")
     ordering = ("-created_at",)
+    readonly_fields = ("label_preview",)
     search_fields = (
         "vmp_name",
         "brewery__name",
@@ -91,6 +115,12 @@ class BeerAdmin(admin.ModelAdmin):
         "untpd_id",
         "style",
     )
+
+    @admin.display(description="Label")
+    def label_preview(self, obj: Beer) -> str:
+        if not obj.label_hd_url:
+            return "\u2014"
+        return format_html('<img src="{}" style="height:40px;" />', obj.label_hd_url)
 
 
 @admin.register(MatchManually)
@@ -111,9 +141,17 @@ class MatchManuallyAdmin(BeerAdmin):
 
 @admin.register(Brewery)
 class BreweryAdmin(admin.ModelAdmin):
-    list_display = ("id", "name", "untpd_url", "label_url", "untpd_updated")
+    list_display = ("name", "untpd_url", "logo_preview", "untpd_updated")
     search_fields = ("name", "untpd_url")
     ordering = ("name",)
+    inlines = (BeerBreweryInline,)
+    readonly_fields = ("logo_preview",)
+
+    @admin.display(description="Logo")
+    def logo_preview(self, obj: Brewery) -> str:
+        if not obj.label_url:
+            return "\u2014"
+        return format_html('<img src="{}" style="height:40px;" />', obj.label_url)
 
 
 @admin.register(Store)
