@@ -9,6 +9,8 @@ from rest_framework.views import APIView
 
 
 class NullsAlwaysLastOrderingFilter(filters.OrderingFilter):
+    _ordering_aliases = {"brewery": "brewery__name"}
+
     def filter_queryset(  # type: ignore[override]
         self, request: Request, queryset: QuerySet[Beer], view: APIView
     ) -> QuerySet[Beer]:
@@ -24,10 +26,11 @@ class NullsAlwaysLastOrderingFilter(filters.OrderingFilter):
                 if clean_field == "price_per_alcohol_unit":
                     queryset = queryset.filter(abv__gte=1)
 
+                source = self._ordering_aliases.get(clean_field, clean_field)
                 if field_name.startswith("-"):
-                    f_ordering.append(F(field_name[1:]).desc(nulls_last=True))
+                    f_ordering.append(F(source).desc(nulls_last=True))
                 else:
-                    f_ordering.append(F(field_name).asc(nulls_last=True))
+                    f_ordering.append(F(source).asc(nulls_last=True))
 
             tie_breakers = {"vmp_name": F("vmp_name").asc(), "pk": F("pk").asc()}
             used = {f.lstrip("-") for f in ordering if f}
@@ -42,6 +45,7 @@ class NullsAlwaysLastOrderingFilter(filters.OrderingFilter):
 
 class BeerFilter(flt.FilterSet):
     style = flt.CharFilter(method="custom_style_filter")
+    brewery = flt.CharFilter(field_name="brewery__name")
     product_selection = flt.CharFilter(method="custom_product_selection_filter")
     store = flt.CharFilter(method="custom_store_filter")
     country = flt.CharFilter(method="custom_country_filter")
@@ -86,7 +90,9 @@ class BeerFilter(flt.FilterSet):
         for store_id in value.split(","):
             store_id = store_id.strip()
             if store_id.isdigit():
-                query |= Q(stock_set__store__exact=int(store_id)) & ~Q(stock_set__quantity=0)
+                query |= Q(stock_set__store__exact=int(store_id)) & ~Q(
+                    stock_set__quantity=0
+                )
         return queryset.filter(query).distinct()
 
     def custom_country_filter(

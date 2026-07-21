@@ -11,6 +11,7 @@ from django.http import HttpRequest
 from beers.models import (
     Badge,
     Beer,
+    Brewery,
     Country,
     ExternalAPI,
     Option,
@@ -84,7 +85,7 @@ class BeerAdmin(admin.ModelAdmin):
     ordering = ("-created_at",)
     search_fields = (
         "vmp_name",
-        "brewery",
+        "brewery__name",
         "vmp_brewery",
         "vmp_id",
         "untpd_id",
@@ -106,6 +107,13 @@ class MatchManuallyAdmin(BeerAdmin):
 
     def get_queryset(self, request: HttpRequest) -> QuerySet[Beer]:
         return self.model.objects.filter(match_manually=True, active=True)
+
+
+@admin.register(Brewery)
+class BreweryAdmin(admin.ModelAdmin):
+    list_display = ("id", "name", "untpd_url", "label_url", "untpd_updated")
+    search_fields = ("name", "untpd_url")
+    ordering = ("name",)
 
 
 @admin.register(Store)

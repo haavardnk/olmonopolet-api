@@ -1,7 +1,7 @@
 import pytest
 import responses
 from beers.models import Option, WrongMatch
-from beers.tests.factories import BeerFactory
+from beers.tests.factories import BeerFactory, BreweryFactory
 
 
 class TestValueScore:
@@ -70,7 +70,7 @@ class TestBeerSaveMatchManuallyCascade:
             untpd_name="Test Untappd",
             untpd_url="https://untappd.com/beer/123",
             verified_match=True,
-            brewery="Test Brewery",
+            brewery=BreweryFactory(),
             rating=4.2,
             checkins=500,
             style="IPA",

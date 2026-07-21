@@ -46,6 +46,11 @@ def update_beers_from_untappd(**kwargs) -> str:
     return _call_command_with_output("update_beers_from_untappd", calls)
 
 
+def update_breweries_from_untappd(**kwargs) -> str:
+    calls = kwargs.get("calls", 50)
+    return _call_command_with_output("update_breweries_from_untappd", calls)
+
+
 def update_details_from_vmp(calls: int) -> str:
     return _call_command_with_output("update_details_from_vmp", calls)
 

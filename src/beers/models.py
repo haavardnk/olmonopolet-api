@@ -31,6 +31,24 @@ class Country(models.Model):
         return f"{self.name}"
 
 
+class Brewery(models.Model):
+    name = models.CharField(max_length=200, blank=True, null=True)
+    untpd_url = models.CharField(
+        max_length=250, validators=[URLValidator()], unique=True
+    )
+    label_url = models.CharField(
+        max_length=250, validators=[URLValidator()], blank=True, null=True
+    )
+    description = models.TextField(blank=True, null=True)
+    untpd_updated = models.DateTimeField(blank=True, null=True)
+
+    class Meta:
+        verbose_name_plural = "Breweries"
+
+    def __str__(self):
+        return self.name or self.untpd_url
+
+
 class Beer(DirtyFieldsMixin, models.Model):
     # Vinmonopolet info
     vmp_id = models.BigIntegerField(primary_key=True)
@@ -77,7 +95,13 @@ class Beer(DirtyFieldsMixin, models.Model):
     verified_match = models.BooleanField(default=False)
     match_manually = models.BooleanField(default=False)
     prioritize_recheck = models.BooleanField(default=False)
-    brewery = models.CharField(max_length=100, blank=True, null=True)
+    brewery = models.ForeignKey(
+        Brewery,
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name="beers",
+    )
     rating = models.FloatField(
         validators=[MinValueValidator(0), MaxValueValidator(5)], blank=True, null=True
     )

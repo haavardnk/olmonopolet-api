@@ -7,7 +7,7 @@ from datetime import timedelta
 from itertools import chain
 
 import cloudscraper25
-from beers.models import Beer
+from beers.models import Beer, Brewery
 from bs4 import BeautifulSoup
 from cloudscraper25 import CloudScraper
 from django.core.management.base import BaseCommand, CommandError
@@ -105,7 +105,6 @@ class Command(BaseCommand):
             data = json_ld_data[0]
             beer.untpd_id = data.get("sku", beer.untpd_id)
             beer.untpd_name = data.get("name", beer.untpd_name)
-            beer.brewery = data.get("brand", {}).get("name", beer.brewery)
             beer.rating = data.get("aggregateRating", {}).get(
                 "ratingValue", beer.rating
             )
@@ -116,7 +115,23 @@ class Command(BaseCommand):
         else:
             self._update_from_html_fallback(beer, soup)
 
+        self._link_brewery(beer, soup)
         self._extract_html_only_fields(beer, soup)
+
+    def _link_brewery(self, beer: Beer, soup: BeautifulSoup) -> None:
+        anchor = soup.select_one("p.brewery a")
+        if not anchor:
+            return
+        href = str(anchor.get("href") or "")
+        if not href:
+            return
+        untpd_url = href if href.startswith("http") else f"https://untappd.com{href}"
+        name = anchor.text.strip() or None
+        brewery, _ = Brewery.objects.get_or_create(
+            untpd_url=untpd_url,
+            defaults={"name": name},
+        )
+        beer.brewery = brewery
 
     def _update_from_html_fallback(self, beer: Beer, soup: BeautifulSoup) -> None:
         try:
@@ -136,7 +151,6 @@ class Command(BaseCommand):
                 brewery_text = brewery_link.text if brewery_link else ""
                 name_text = name_header.text if name_header else ""
                 beer.untpd_name = f"{brewery_text} {name_text}".strip()
-                beer.brewery = brewery_text
         except AttributeError:
             pass
 

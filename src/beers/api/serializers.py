@@ -8,6 +8,7 @@ import requests as http_requests
 from beers.models import (
     Badge,
     Beer,
+    Brewery,
     Country,
     Release,
     Stock,
@@ -26,11 +27,21 @@ from rest_framework import serializers
 from .utils import parse_bool
 
 
+class BrewerySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Brewery
+        fields = ["id", "name", "untpd_url", "label_url", "description"]
+
+
 class BeerSerializer(DynamicFieldsMixin, serializers.ModelSerializer):
     url = serializers.HyperlinkedIdentityField(view_name="beer-detail")
     badges = serializers.SerializerMethodField("get_badges")
     stock = serializers.SerializerMethodField("get_stock")
     all_stock = serializers.SerializerMethodField("get_all_stock")
+    brewery = serializers.CharField(
+        source="brewery.name", read_only=True, allow_null=True
+    )
+    brewery_details = BrewerySerializer(source="brewery", read_only=True)
     country = serializers.CharField(
         source="country.name", read_only=True, allow_null=True
     )
@@ -70,6 +81,7 @@ class BeerSerializer(DynamicFieldsMixin, serializers.ModelSerializer):
             "vmp_name",
             "untpd_name",
             "brewery",
+            "brewery_details",
             "vmp_brewery",
             "country",
             "country_code",

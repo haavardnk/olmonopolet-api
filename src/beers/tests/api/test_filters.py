@@ -1,7 +1,12 @@
 import pytest
 from beers.api.filters import BeerFilter, NullsAlwaysLastOrderingFilter
 from beers.models import Beer
-from beers.tests.factories import BeerFactory, StockFactory, StoreFactory
+from beers.tests.factories import (
+    BeerFactory,
+    BreweryFactory,
+    StockFactory,
+    StoreFactory,
+)
 from django.test import RequestFactory
 from rest_framework.request import Request
 from rest_framework.views import APIView
@@ -54,7 +59,9 @@ class TestAllergenFilter:
         beer_none = BeerFactory(allergens=None)
 
         f = BeerFilter()
-        result = f.custom_allergen_filter(Beer.objects.all(), "exclude_allergen", "Gluten")
+        result = f.custom_allergen_filter(
+            Beer.objects.all(), "exclude_allergen", "Gluten"
+        )
         pks = list(result.values_list("pk", flat=True))
 
         assert beer_gluten.pk not in pks
@@ -80,7 +87,9 @@ class TestAllergenFilter:
         beer_clean = BeerFactory(allergens=None)
 
         f = BeerFilter()
-        result = f.custom_allergen_filter(Beer.objects.all(), "exclude_allergen", "Gluten")
+        result = f.custom_allergen_filter(
+            Beer.objects.all(), "exclude_allergen", "Gluten"
+        )
         pks = list(result.values_list("pk", flat=True))
 
         assert beer_both.pk not in pks
@@ -149,8 +158,9 @@ class TestNullsAlwaysLastOrderingFilter:
 
     @pytest.mark.parametrize("ordering", ["brewery", "-brewery", "rating", "vmp_name"])
     def test_ordering_is_stable_across_calls(self, ordering: str) -> None:
+        brewery = BreweryFactory(name="Same Brewery")
         for _ in range(20):
-            BeerFactory(brewery="Same Brewery", rating=4.0)
+            BeerFactory(brewery=brewery, rating=4.0)
         for _ in range(5):
             BeerFactory(brewery=None, rating=None)
 
@@ -180,8 +190,9 @@ class TestPaginationStability:
     def test_brewery_ordering_paginated_no_drift(self) -> None:
         from rest_framework.test import APIClient
 
+        brewery = BreweryFactory(name="Acme Brewing")
         for _ in range(30):
-            BeerFactory(brewery="Acme Brewing")
+            BeerFactory(brewery=brewery)
         for _ in range(10):
             BeerFactory(brewery=None)
 
@@ -191,9 +202,7 @@ class TestPaginationStability:
         seen: set[int] = set()
         page = 1
         while True:
-            response = client.get(
-                f"/beers/?ordering=brewery&page={page}&page_size=7"
-            )
+            response = client.get(f"/beers/?ordering=brewery&page={page}&page_size=7")
             assert response.status_code == 200
             for row in response.data["results"]:
                 assert row["vmp_id"] not in seen

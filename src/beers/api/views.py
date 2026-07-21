@@ -100,7 +100,7 @@ class BeerViewSet(BrowsableMixin, ModelViewSet):
     )
     search_fields = [
         "vmp_name",
-        "brewery",
+        "brewery__name",
         "sub_category",
         "style",
         "vmp_id",

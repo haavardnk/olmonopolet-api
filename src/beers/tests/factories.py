@@ -1,5 +1,5 @@
 import factory
-from beers.models import Beer, Country, Stock, Store
+from beers.models import Beer, Brewery, Country, Stock, Store
 from django.contrib.auth.models import User
 
 
@@ -25,6 +25,14 @@ class BeerFactory(factory.django.DjangoModelFactory):
 
     vmp_id = factory.Sequence(lambda n: 10000000 + n)
     vmp_name = factory.Sequence(lambda n: f"Test Beer {n}")
+
+
+class BreweryFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = Brewery
+
+    name = factory.Sequence(lambda n: f"Brewery {n}")
+    untpd_url = factory.Sequence(lambda n: f"https://untappd.com/brewery-{n}")
 
 
 class StoreFactory(factory.django.DjangoModelFactory):
