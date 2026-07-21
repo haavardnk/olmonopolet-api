@@ -63,6 +63,8 @@ class Command(VmpCommand):
             )
 
     def _update_product_details(self, beer: Beer, detail: VmpProductDetail) -> None:
+        if detail.producer is not None:
+            beer.vmp_brewery = detail.producer.name
         if detail.color is not None:
             beer.color = detail.color
         if detail.smell is not None:

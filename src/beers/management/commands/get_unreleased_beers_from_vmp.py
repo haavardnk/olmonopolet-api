@@ -3,7 +3,7 @@ from __future__ import annotations
 from beers.models import Beer, VmpNotReleased
 from beers.vmp import VmpApiError
 from beers.vmp.commands import VmpCommand, apply_product_fields
-from beers.vmp.models import VmpProduct
+from beers.vmp.models import VmpProductDetail
 from django.core.management.base import CommandError
 
 
@@ -47,7 +47,7 @@ class Command(VmpCommand):
                 f"All {failed} unreleased lookups failed (vinmonopolet unreachable)"
             )
 
-    def _save_beer(self, product: VmpProduct) -> bool:
+    def _save_beer(self, product: VmpProductDetail) -> bool:
         code = int(product.code)
         try:
             beer = Beer.objects.get(vmp_id=code)
@@ -57,5 +57,7 @@ class Command(VmpCommand):
             is_update = False
 
         apply_product_fields(beer, product)
+        if product.producer is not None:
+            beer.vmp_brewery = product.producer.name
         beer.save()
         return is_update

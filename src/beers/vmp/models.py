@@ -96,6 +96,7 @@ class Content(_Base):
 
 class VmpProductDetail(VmpProduct):
     content: Content | None = None
+    producer: Named | None = Field(default=None, alias="main_producer")
     color: str | None = None
     smell: str | None = None
     taste: str | None = None

@@ -82,7 +82,14 @@ class BeerAdmin(admin.ModelAdmin):
     )
     list_editable = ("match_manually", "active")
     ordering = ("-created_at",)
-    search_fields = ("vmp_name", "brewery", "vmp_id", "untpd_id", "style")
+    search_fields = (
+        "vmp_name",
+        "brewery",
+        "vmp_brewery",
+        "vmp_id",
+        "untpd_id",
+        "style",
+    )
 
 
 @admin.register(MatchManually)

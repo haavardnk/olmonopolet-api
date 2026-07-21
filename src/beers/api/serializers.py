@@ -70,6 +70,7 @@ class BeerSerializer(DynamicFieldsMixin, serializers.ModelSerializer):
             "vmp_name",
             "untpd_name",
             "brewery",
+            "vmp_brewery",
             "country",
             "country_code",
             "product_selection",
@@ -359,7 +360,9 @@ class UserListMethodsMixin:
         product_ids = [item.product_id for item in items]
         prices = {
             str(vmp_id): price
-            for vmp_id, price in Beer.objects.filter(vmp_id__in=product_ids).values_list("vmp_id", "price")
+            for vmp_id, price in Beer.objects.filter(
+                vmp_id__in=product_ids
+            ).values_list("vmp_id", "price")
         }
         total_value = sum(
             item.quantity * (prices.get(item.product_id) or 0) for item in items
@@ -380,7 +383,9 @@ class UserListMethodsMixin:
         product_ids = [item.product_id for item in items]
         prices = {
             str(vmp_id): price
-            for vmp_id, price in Beer.objects.filter(vmp_id__in=product_ids).values_list("vmp_id", "price")
+            for vmp_id, price in Beer.objects.filter(
+                vmp_id__in=product_ids
+            ).values_list("vmp_id", "price")
         }
         total = sum(
             item.quantity * (prices.get(item.product_id) or 0) for item in items
@@ -543,7 +548,13 @@ class UserListCreateSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data: dict) -> UserList:
         list_type = validated_data.pop("list_type", "standard")
-        flag_keys = {"show_quantity", "show_store", "show_vintage", "show_prices", "show_notes"}
+        flag_keys = {
+            "show_quantity",
+            "show_store",
+            "show_vintage",
+            "show_prices",
+            "show_notes",
+        }
         has_flags = any(k in validated_data for k in flag_keys)
         if not has_flags:
             for key, val in FLAG_DEFAULTS.get(list_type, {}).items():
@@ -572,7 +583,13 @@ class UserListUpdateSerializer(serializers.ModelSerializer):
 
     def update(self, instance: UserList, validated_data: dict) -> UserList:
         list_type = validated_data.pop("list_type", None)
-        flag_keys = {"show_quantity", "show_store", "show_vintage", "show_prices", "show_notes"}
+        flag_keys = {
+            "show_quantity",
+            "show_store",
+            "show_vintage",
+            "show_prices",
+            "show_notes",
+        }
         has_flags = any(k in validated_data for k in flag_keys)
         if list_type and not has_flags:
             for key, val in FLAG_DEFAULTS.get(list_type, {}).items():

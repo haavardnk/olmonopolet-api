@@ -35,6 +35,7 @@ DETAIL_JSON = {
     **PRODUCT_JSON,
     "color": "Gyllen",
     "smell": "Sitrus",
+    "main_producer": {"code": "amundsen_bryggeri", "name": "Amundsen Bryggeri"},
     "taste": "Humle",
     "allergens": "Inneholder gluten",
     "method": "Overgjæret",
@@ -107,6 +108,8 @@ class TestProductDetail:
 
         assert detail.color == "Gyllen"
         assert detail.vintage == 2024
+        assert detail.producer is not None
+        assert detail.producer.name == "Amundsen Bryggeri"
         assert detail.content is not None
         names = [c.name for c in detail.content.characteristics]
         assert "Fylde" in names

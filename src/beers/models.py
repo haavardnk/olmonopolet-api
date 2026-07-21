@@ -35,6 +35,7 @@ class Beer(DirtyFieldsMixin, models.Model):
     # Vinmonopolet info
     vmp_id = models.BigIntegerField(primary_key=True)
     vmp_name = models.CharField(max_length=150)
+    vmp_brewery = models.CharField(max_length=100, blank=True, null=True)
     main_category = models.CharField(max_length=50, blank=True, null=True)
     sub_category = models.CharField(max_length=50, blank=True, null=True)
     country = models.ForeignKey(
