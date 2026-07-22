@@ -33,6 +33,12 @@ from beers.models import (
 )
 
 
+def _thumb(url: str | None) -> str:
+    if not url:
+        return "\u2014"
+    return format_html('<img src="{}" style="height:40px;" />', url)
+
+
 class MatchManually(Beer):
     class Meta:
         proxy = True
@@ -83,9 +89,7 @@ class BeerBreweryInline(admin.TabularInline):
 
     @admin.display(description="Logo")
     def label_sm_preview(self, obj: Beer) -> str:
-        if not obj.label_sm_url:
-            return "\u2014"
-        return format_html('<img src="{}" style="height:40px;" />', obj.label_sm_url)
+        return _thumb(obj.label_sm_url)
 
 
 @admin.register(Beer)
@@ -119,9 +123,7 @@ class BeerAdmin(admin.ModelAdmin):
 
     @admin.display(description="Label")
     def label_preview(self, obj: Beer) -> str:
-        if not obj.label_hd_url:
-            return "\u2014"
-        return format_html('<img src="{}" style="height:40px;" />', obj.label_hd_url)
+        return _thumb(obj.label_hd_url)
 
 
 @admin.register(MatchManually)
@@ -150,15 +152,40 @@ class BreweryAdmin(admin.ModelAdmin):
 
     @admin.display(description="Logo")
     def logo_preview(self, obj: Brewery) -> str:
-        if not obj.label_url:
-            return "\u2014"
-        return format_html('<img src="{}" style="height:40px;" />', obj.label_url)
+        return _thumb(obj.label_url)
+
+
+class StockInline(admin.TabularInline):
+    model = Stock
+    extra = 0
+    can_delete = False
+    fields = ("label_preview", "beer_link", "quantity", "stock_updated")
+    readonly_fields = ("label_preview", "beer_link", "quantity", "stock_updated")
+    ordering = ("beer__vmp_name",)
+
+    def has_add_permission(
+        self, request: HttpRequest, obj: Store | None = None
+    ) -> bool:
+        return False
+
+    def get_queryset(self, request: HttpRequest) -> QuerySet:
+        return super().get_queryset(request).select_related("beer")
+
+    @admin.display(description="Logo")
+    def label_preview(self, obj: Stock) -> str:
+        return _thumb(obj.beer.label_sm_url)
+
+    @admin.display(description="Beer")
+    def beer_link(self, obj: Stock) -> str:
+        url = reverse("admin:beers_beer_change", args=[obj.beer.pk])
+        return format_html('<a href="{}">{}</a>', url, obj.beer.vmp_name or obj.beer.pk)
 
 
 @admin.register(Store)
 class StoreAdmin(admin.ModelAdmin):
     list_display = ("name", "store_id", "address", "store_updated")
     search_fields = ("name", "store_id")
+    inlines = (StockInline,)
 
 
 @admin.register(VmpCrawlState)
@@ -170,6 +197,7 @@ class VmpCrawlStateAdmin(admin.ModelAdmin):
 class StockAdmin(admin.ModelAdmin):
     list_display = ("store", "beer", "quantity", "stock_updated")
     search_fields = ("store__name", "beer__vmp_name")
+    autocomplete_fields = ("store", "beer")
 
 
 class ReleaseBeerInline(admin.TabularInline):
@@ -191,11 +219,7 @@ class ReleaseBeerInline(admin.TabularInline):
 
     @admin.display(description="Logo")
     def label_sm_preview(self, obj) -> str:
-        if not obj.beer.label_sm_url:
-            return "\u2014"
-        return format_html(
-            '<img src="{}" style="height:40px;" />', obj.beer.label_sm_url
-        )
+        return _thumb(obj.beer.label_sm_url)
 
     @admin.display(description="Beer")
     def beer_link(self, obj) -> str:
