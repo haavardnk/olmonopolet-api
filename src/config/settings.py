@@ -50,7 +50,9 @@ INSTALLED_APPS = [
     "django_extensions",
     "django_hosts",
     "django_admin_shell",
+    "rest_framework_api_key",
     "beers",
+    "apikeys",
     "corsheaders",
 ]
 
@@ -152,7 +154,26 @@ REST_FRAMEWORK = {
         "rest_framework.renderers.JSONRenderer",
     ],
     "DEFAULT_FILTER_BACKENDS": ("django_filters.rest_framework.DjangoFilterBackend",),
+    "DEFAULT_THROTTLE_RATES": {
+        "user": "1000/min",
+        "apikey_internal": None,
+        "apikey_official": "6000/min",
+        "apikey_partner": "6000/min",
+        "apikey_free": "120/min",
+    },
 }
+
+API_KEY_CUSTOM_HEADER = "HTTP_X_API_KEY"
+API_LOCKDOWN_ENABLED = int(os.getenv("API_LOCKDOWN_ENABLED", 0))
+
+if API_LOCKDOWN_ENABLED:
+    REST_FRAMEWORK["DEFAULT_PERMISSION_CLASSES"] = (
+        "apikeys.permissions.IsAuthenticatedOrHasAPIKey",
+    )
+    REST_FRAMEWORK["DEFAULT_THROTTLE_CLASSES"] = (
+        "apikeys.throttling.TieredAPIKeyThrottle",
+        "rest_framework.throttling.UserRateThrottle",
+    )
 
 
 if REDIS_CACHE_URL:

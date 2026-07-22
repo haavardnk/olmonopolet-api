@@ -178,6 +178,7 @@ dependencies = [
     { name = "django-hosts" },
     { name = "django-q2" },
     { name = "djangorestframework" },
+    { name = "djangorestframework-api-key" },
     { name = "drf-dynamic-fields" },
     { name = "factory-boy" },
     { name = "feedparser" },
@@ -220,6 +221,7 @@ requires-dist = [
     { name = "django-hosts", specifier = ">=6.0" },
     { name = "django-q2", specifier = ">=1.7.3" },
     { name = "djangorestframework", specifier = ">=3.15.2" },
+    { name = "djangorestframework-api-key", specifier = ">=3.1.0" },
     { name = "drf-dynamic-fields", specifier = ">=0.4.0" },
     { name = "factory-boy", specifier = ">=3.3.3" },
     { name = "feedparser", specifier = ">=6.0.0" },
@@ -638,6 +640,18 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/ca/d7/c016e69fac19ff8afdc89db9d31d9ae43ae031e4d1993b20aca179b8301a/djangorestframework-3.17.1.tar.gz", hash = "sha256:a6def5f447fe78ff853bff1d47a3c59bf38f5434b031780b351b0c73a62db1a5", size = 905742 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/5a/e1/2c516bdc83652b1a60c6119366ac2c0607b479ed05cd6093f916ca8928f8/djangorestframework-3.17.1-py3-none-any.whl", hash = "sha256:c3c74dd3e83a5a3efc37b3c18d92bd6f86a6791c7b7d4dff62bb068500e76457", size = 898844 },
+]
+
+[[package]]
+name = "djangorestframework-api-key"
+version = "3.1.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "packaging" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/95/d9/d187626f67eec3d8c7fb170009ffc323e70553dbac8832ca051f4c7e0a53/djangorestframework_api_key-3.1.0.tar.gz", hash = "sha256:7e9c88360933b3c46467d80645a50cf36697674c7856a737a1c674d570860ac9", size = 36922 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/60/50/29fd576a9162ff3fcd0423ae5a30e7f9610a438329dd20081a60c758f100/djangorestframework_api_key-3.1.0-py3-none-any.whl", hash = "sha256:1b6ed7d89308cf872b29084cf68f9b7171f7efd2b8f84f480c09aa4232f910c1", size = 15664 },
 ]
 
 [[package]]
