@@ -7,6 +7,7 @@ from django.db import models
 from django.db.models import Count, QuerySet
 from django.db.models.functions import Cast
 from django.http import HttpRequest
+from django.urls import reverse
 from django.utils.html import format_html
 
 from beers.models import (
@@ -171,10 +172,55 @@ class StockAdmin(admin.ModelAdmin):
     search_fields = ("store__name", "beer__vmp_name")
 
 
+class ReleaseBeerInline(admin.TabularInline):
+    model = Release.beer.through
+    extra = 0
+    can_delete = False
+    fields = ("label_sm_preview", "beer_link", "beer_rating")
+    readonly_fields = ("label_sm_preview", "beer_link", "beer_rating")
+    verbose_name = "Beer"
+    verbose_name_plural = "Beers"
+
+    def has_add_permission(
+        self, request: HttpRequest, obj: Release | None = None
+    ) -> bool:
+        return False
+
+    def get_queryset(self, request: HttpRequest) -> QuerySet:
+        return super().get_queryset(request).select_related("beer")
+
+    @admin.display(description="Logo")
+    def label_sm_preview(self, obj) -> str:
+        if not obj.beer.label_sm_url:
+            return "\u2014"
+        return format_html(
+            '<img src="{}" style="height:40px;" />', obj.beer.label_sm_url
+        )
+
+    @admin.display(description="Beer")
+    def beer_link(self, obj) -> str:
+        url = reverse("admin:beers_beer_change", args=[obj.beer.pk])
+        name = obj.beer.vmp_name or obj.beer.untpd_name or obj.beer.pk
+        return format_html('<a href="{}">{}</a>', url, name)
+
+    @admin.display(description="Rating")
+    def beer_rating(self, obj):
+        return obj.beer.rating
+
+
 @admin.register(Release)
 class ReleaseAdmin(admin.ModelAdmin):
-    list_display = ("name", "active", "release_date")
+    list_display = ("name", "active", "release_date", "beer_count")
     ordering = ("-release_date",)
+    exclude = ("beer",)
+    inlines = (ReleaseBeerInline,)
+
+    def get_queryset(self, request: HttpRequest) -> QuerySet[Release]:
+        return super().get_queryset(request).annotate(_beer_count=Count("beer"))
+
+    @admin.display(description="Beers", ordering="_beer_count")
+    def beer_count(self, obj: Release) -> int:
+        return obj._beer_count
 
 
 @admin.register(Country)
