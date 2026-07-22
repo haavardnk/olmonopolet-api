@@ -123,7 +123,7 @@ class BeerViewSet(BrowsableMixin, ModelViewSet):
 
     def get_queryset(self) -> QuerySet[Beer]:
         queryset = Beer.objects.all()
-        queryset = queryset.select_related("country").prefetch_related(
+        queryset = queryset.select_related("country", "brewery").prefetch_related(
             "badge_set",
             Prefetch("stock_set", queryset=Stock.objects.select_related("store")),
         )
