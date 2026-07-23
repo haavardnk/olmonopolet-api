@@ -44,6 +44,7 @@ from beers.models import (
     UserListItem,
     WrongMatch,
 )
+from beers.patreon import fetch_patreon_posts
 from beers.untappd_lists import fetch_user_lists
 from beers.vmp import VmpApiError, VmpBlockedError, VmpClient
 from django.contrib.postgres.aggregates import ArrayAgg
@@ -762,3 +763,13 @@ class ExtensionTokenView(APIView):
     def delete(self, request):
         Token.objects.filter(user=request.user).delete()
         return Response(status=204)
+
+
+class PatreonPostsView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        posts = fetch_patreon_posts(10)
+        response = Response(posts)
+        response["Cache-Control"] = f"public, max-age={PUBLIC_CACHE_SECONDS}"
+        return response

@@ -2,6 +2,7 @@ from beers.api.views import (
     BeerViewSet,
     CountryViewSet,
     ExtensionTokenView,
+    PatreonPostsView,
     ReleaseViewSet,
     StockChangeViewSet,
     StockViewSet,
@@ -30,5 +31,6 @@ router.register("rss", UntappdRssFeedViewSet, basename="untappd-rss")
 
 urlpatterns = [
     path("auth/extension-token/", ExtensionTokenView.as_view(), name="extension-token"),
+    path("patreon/posts/", PatreonPostsView.as_view(), name="patreon-posts"),
     path("", include(router.urls)),
 ]
