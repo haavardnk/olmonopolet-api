@@ -26,10 +26,11 @@ from django_q.tasks import async_task
 from rest_framework import filters, permissions
 from rest_framework.authtoken.models import Token
 from rest_framework.decorators import action
+from rest_framework.mixins import CreateModelMixin
 from rest_framework.renderers import BrowsableAPIRenderer
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.viewsets import ModelViewSet
+from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
 from beers.api.filters import (
     BeerFilter,
@@ -301,10 +302,9 @@ class StockViewSet(BrowsableMixin, ModelViewSet):
     filterset_fields = ["store", "beer"]
 
 
-class WrongMatchViewSet(BrowsableMixin, ModelViewSet):
+class WrongMatchViewSet(BrowsableMixin, CreateModelMixin, GenericViewSet):
     queryset = WrongMatch.objects.all().select_related("beer")
     serializer_class = WrongMatchSerializer
-    pagination_class = Pagination
     permission_classes = [permissions.AllowAny]
 
 

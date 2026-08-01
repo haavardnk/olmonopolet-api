@@ -224,7 +224,6 @@ class StockSerializer(serializers.ModelSerializer):
 
 
 class WrongMatchSerializer(serializers.ModelSerializer):
-    url = serializers.HyperlinkedIdentityField(view_name="wrongmatch-detail")
     beer_name = serializers.CharField(read_only=True, source="beer.vmp_name")
     current_untpd_url = serializers.CharField(read_only=True, source="beer.untpd_url")
     current_untpd_id = serializers.CharField(read_only=True, source="beer.untpd_id")
@@ -232,7 +231,6 @@ class WrongMatchSerializer(serializers.ModelSerializer):
     class Meta:
         model = WrongMatch
         fields = [
-            "url",
             "beer",
             "beer_name",
             "current_untpd_url",
