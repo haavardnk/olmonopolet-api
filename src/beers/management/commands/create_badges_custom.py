@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from beers.models import Badge, Beer
 from django.core.management.base import BaseCommand
+
+from beers.models import Badge, Beer
 
 if TYPE_CHECKING:
     from argparse import ArgumentParser

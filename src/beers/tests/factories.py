@@ -1,6 +1,7 @@
 import factory
-from beers.models import Beer, Brewery, Country, Stock, Store
 from django.contrib.auth.models import User
+
+from beers.models import Beer, Brewery, Country, Stock, Store
 
 
 class UserFactory(factory.django.DjangoModelFactory):

@@ -1,9 +1,10 @@
 from datetime import timedelta
 
 import pytest
+from django.utils import timezone
+
 from beers.models import Beer
 from beers.tasks import deactivate_inactive
-from django.utils import timezone
 
 
 @pytest.mark.django_db

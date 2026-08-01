@@ -6,8 +6,9 @@ import time
 
 import requests
 import sentry_sdk
-from beers.models import Option
 from django.core.cache import cache
+
+from beers.models import Option
 
 logger = logging.getLogger(__name__)
 

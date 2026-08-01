@@ -1,7 +1,8 @@
 import pytest
+from rest_framework.test import APIClient
+
 from beers.models import Tasted
 from beers.tests.factories import BeerFactory, UserFactory
-from rest_framework.test import APIClient
 
 
 @pytest.fixture

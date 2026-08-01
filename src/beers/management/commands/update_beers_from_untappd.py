@@ -4,11 +4,11 @@ from argparse import ArgumentParser
 from datetime import timedelta
 from itertools import chain
 
-from clients.untappd import UntappdBeer, UntappdClient
 from django.core.management.base import BaseCommand, CommandError
 from django.utils import timezone
 
 from beers.models import Beer, Brewery
+from clients.untappd import UntappdBeer, UntappdClient
 
 
 class Command(BaseCommand):

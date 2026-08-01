@@ -4,9 +4,10 @@ from argparse import ArgumentParser
 from datetime import timedelta
 from typing import Any
 
-from beers.models import Beer, Stock
 from django.core.management.base import BaseCommand
 from django.utils import timezone
+
+from beers.models import Beer, Stock
 
 
 class Command(BaseCommand):

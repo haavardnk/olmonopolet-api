@@ -1,8 +1,9 @@
 import pytest
 import responses
+from django.core.cache import cache
+
 from beers.models import ExternalAPI
 from clients.vmp import VmpApiError, VmpBlockedError, VmpClient, circuit_breaker
-from django.core.cache import cache
 
 from .test_models import DETAIL_JSON, PRODUCT_JSON, SEARCH_JSON, STORE_JSON
 

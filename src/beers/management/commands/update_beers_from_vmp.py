@@ -2,6 +2,10 @@ from __future__ import annotations
 
 from argparse import ArgumentParser
 
+from django.core.management.base import CommandError
+from django.db import transaction
+from django.utils import timezone
+
 from beers.models import Beer, VmpCrawlState
 from beers.vmp_commands import (
     CATEGORIES,
@@ -12,9 +16,6 @@ from beers.vmp_commands import (
 )
 from clients.vmp import VmpBlockedError, circuit_breaker
 from clients.vmp.models import VmpProduct
-from django.core.management.base import CommandError
-from django.db import transaction
-from django.utils import timezone
 
 
 class Command(VmpCommand):

@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from beers.models import Badge, Beer
 from django.core.management.base import BaseCommand
+
+from beers.models import Badge, Beer
 
 
 class Command(BaseCommand):

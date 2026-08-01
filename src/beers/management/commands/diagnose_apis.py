@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import cloudscraper25
+
 from beers.models import Store
 from beers.vmp_commands import VmpCommand
 

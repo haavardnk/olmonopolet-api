@@ -1,12 +1,13 @@
 import pytest
 import responses
+from rest_framework.test import APIClient
+
 from beers.models import Option
 from clients.patreon import (
     POSTS_URL,
     TOKEN_URL,
     fetch_patreon_posts,
 )
-from rest_framework.test import APIClient
 
 CAMPAIGN_ID = "camp1"
 POSTS_ENDPOINT = POSTS_URL.format(campaign_id=CAMPAIGN_ID)

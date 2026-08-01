@@ -2,6 +2,11 @@ import io
 from unittest.mock import patch
 
 import pytest
+from django.core.cache import cache
+from django.utils import timezone
+from rest_framework.authtoken.models import Token
+from rest_framework.test import APIClient
+
 from beers.models import (
     Badge,
     Release,
@@ -20,10 +25,6 @@ from beers.tests.factories import (
     UserFactory,
 )
 from clients.vmp import VmpApiError, VmpBlockedError
-from django.core.cache import cache
-from django.utils import timezone
-from rest_framework.authtoken.models import Token
-from rest_framework.test import APIClient
 
 
 @pytest.fixture(autouse=True)

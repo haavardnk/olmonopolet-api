@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from beers.models import Beer
 from django.core.management.base import BaseCommand
+
+from beers.models import Beer
 
 
 class Command(BaseCommand):

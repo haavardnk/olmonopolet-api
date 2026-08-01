@@ -1,4 +1,5 @@
 import pytest
+
 from beers.models import Badge, Beer
 from beers.tasks import remove_badges
 

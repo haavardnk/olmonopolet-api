@@ -1,8 +1,9 @@
 import time
 
 import pytest
-from clients.vmp import circuit_breaker
 from django.core.cache import cache
+
+from clients.vmp import circuit_breaker
 
 
 @pytest.fixture(autouse=True)

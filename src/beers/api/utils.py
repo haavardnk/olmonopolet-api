@@ -4,9 +4,10 @@ import csv
 import json
 from datetime import datetime, timezone
 
-from beers.models import Beer, Country, Tasted, UntappdCheckin
 from django.contrib.auth.models import User
 from django.db import transaction
+
+from beers.models import Beer, Country, Tasted, UntappdCheckin
 
 CheckinTuple = tuple[int, int, float | None, datetime | None]
 _DATETIME_FORMATS = ("%Y-%m-%d %H:%M:%S", "%a, %d %b %Y %H:%M:%S %z")

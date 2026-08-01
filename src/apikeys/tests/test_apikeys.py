@@ -1,5 +1,4 @@
 import pytest
-from beers.tests.factories import UserFactory
 from django.contrib.auth.models import AnonymousUser
 from django.core.cache import cache
 from rest_framework.test import APIRequestFactory
@@ -8,6 +7,7 @@ from rest_framework.views import APIView
 from apikeys.models import APIAccessRequest, ClientAPIKey
 from apikeys.permissions import HasClientAPIKey, IsAuthenticatedOrHasAPIKey
 from apikeys.throttling import TieredAPIKeyThrottle
+from beers.tests.factories import UserFactory
 
 factory = APIRequestFactory()
 view = APIView()

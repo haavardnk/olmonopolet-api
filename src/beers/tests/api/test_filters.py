@@ -1,4 +1,8 @@
 import pytest
+from django.test import RequestFactory
+from rest_framework.request import Request
+from rest_framework.views import APIView
+
 from beers.api.filters import BeerFilter, NullsAlwaysLastOrderingFilter
 from beers.models import Beer
 from beers.tests.factories import (
@@ -7,9 +11,6 @@ from beers.tests.factories import (
     StockFactory,
     StoreFactory,
 )
-from django.test import RequestFactory
-from rest_framework.request import Request
-from rest_framework.views import APIView
 
 
 @pytest.mark.django_db

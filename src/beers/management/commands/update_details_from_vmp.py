@@ -2,12 +2,13 @@ from __future__ import annotations
 
 from argparse import ArgumentParser
 
+from django.core.management.base import CommandError
+from django.utils import timezone
+
 from beers.models import Beer
 from beers.vmp_commands import VmpCommand
 from clients.vmp import VmpApiError
 from clients.vmp.models import VmpProductDetail
-from django.core.management.base import CommandError
-from django.utils import timezone
 
 CHARACTERISTIC_FIELDS = {
     "Fylde": "fullness",

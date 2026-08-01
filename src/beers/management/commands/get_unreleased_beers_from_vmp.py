@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+from django.core.management.base import CommandError
+
 from beers.models import Beer, VmpNotReleased
 from beers.vmp_commands import VmpCommand, apply_product_fields
 from clients.vmp import VmpApiError
 from clients.vmp.models import VmpProductDetail
-from django.core.management.base import CommandError
 
 
 class Command(VmpCommand):

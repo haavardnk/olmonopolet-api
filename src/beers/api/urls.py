@@ -1,3 +1,7 @@
+from django.conf import settings
+from django.urls import include, path
+from rest_framework.routers import DefaultRouter, SimpleRouter
+
 from beers.api.views import (
     BeerViewSet,
     CountryViewSet,
@@ -12,9 +16,6 @@ from beers.api.views import (
     UserListViewSet,
     WrongMatchViewSet,
 )
-from django.conf import settings
-from django.urls import include, path
-from rest_framework.routers import DefaultRouter, SimpleRouter
 
 router = DefaultRouter() if settings.DEBUG else SimpleRouter()
 

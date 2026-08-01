@@ -1,5 +1,7 @@
 import pytest
 import responses
+from requests import Session
+
 from clients.untappd import (
     UNTAPPD_BASE,
     UntappdClient,
@@ -7,7 +9,6 @@ from clients.untappd import (
     UntappdListNotFound,
     generate_query_variations,
 )
-from requests import Session
 
 LISTS_HTML = """
 <div class="single-list">

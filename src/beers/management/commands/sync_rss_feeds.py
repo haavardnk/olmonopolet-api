@@ -6,10 +6,11 @@ from argparse import ArgumentParser
 from calendar import timegm
 from datetime import datetime, timezone
 
+from django.core.management.base import BaseCommand, CommandError
+
 from beers.api.utils import sync_unmatched_checkins
 from beers.models import UntappdCheckin, UntappdRssFeed
 from clients.untappd import UntappdClient
-from django.core.management.base import BaseCommand, CommandError
 
 
 class Command(BaseCommand):

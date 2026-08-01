@@ -3,6 +3,7 @@ import json
 from datetime import datetime, timezone
 
 import pytest
+
 from beers.api.utils import (
     CheckinTuple,
     _extract_checkin_data,

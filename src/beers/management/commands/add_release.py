@@ -4,10 +4,11 @@ from argparse import ArgumentParser
 from datetime import timedelta
 from typing import Any
 
-from beers.models import VmpNotReleased
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 from django_q.models import Schedule
+
+from beers.models import VmpNotReleased
 
 
 class Command(BaseCommand):

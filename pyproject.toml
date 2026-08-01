@@ -46,6 +46,12 @@ dependencies = [
     "xmltodict>=0.14.2",
 ]
 
+[tool.ruff]
+src = ["src"]
+
+[tool.ruff.lint]
+extend-select = ["I"]
+
 [tool.pyrefly]
 search_path = ["src"]
 

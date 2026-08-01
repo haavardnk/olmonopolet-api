@@ -2,10 +2,11 @@ import json
 
 import pytest
 import responses
+from django.core.management.base import CommandError
+
 from beers.models import Beer, ExternalAPI, Stock, Store
 from beers.tasks import update_stock_from_vmp
 from clients.vmp import circuit_breaker
-from django.core.management.base import CommandError
 
 
 def create_query_url(product, store_id, page):

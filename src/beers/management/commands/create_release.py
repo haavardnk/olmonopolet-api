@@ -3,8 +3,9 @@ from __future__ import annotations
 from argparse import ArgumentParser
 from typing import Any
 
-from beers.models import Beer, Release
 from django.core.management.base import BaseCommand
+
+from beers.models import Beer, Release
 
 
 class Command(BaseCommand):

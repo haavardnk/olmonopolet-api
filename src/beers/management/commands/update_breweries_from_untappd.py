@@ -3,11 +3,12 @@ from __future__ import annotations
 from argparse import ArgumentParser
 from itertools import chain
 
-from beers.models import Brewery
-from clients.untappd import UntappdBrewery, UntappdClient
 from django.core.management.base import BaseCommand, CommandError
 from django.db.models import F
 from django.utils import timezone
+
+from beers.models import Brewery
+from clients.untappd import UntappdBrewery, UntappdClient
 
 
 class Command(BaseCommand):

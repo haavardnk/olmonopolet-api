@@ -3,14 +3,15 @@ from __future__ import annotations
 import time
 from argparse import ArgumentParser
 
+from django.core.management.base import BaseCommand
+from fuzzywuzzy import fuzz, process
+
 from beers.models import Beer
 from clients.untappd import (
     UntappdClient,
     UntappdSearchResult,
     generate_query_variations,
 )
-from django.core.management.base import BaseCommand
-from fuzzywuzzy import fuzz, process
 
 
 class Command(BaseCommand):

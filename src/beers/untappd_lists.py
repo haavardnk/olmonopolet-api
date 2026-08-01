@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import logging
 
+from django.utils import timezone
+
 from beers.models import UntappdList, UserList
 from clients.untappd import UntappdClient, UntappdListNotFound
-from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 

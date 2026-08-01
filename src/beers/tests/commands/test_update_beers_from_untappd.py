@@ -1,4 +1,5 @@
 import pytest
+
 from beers.management.commands.update_beers_from_untappd import Command
 from beers.models import Brewery
 from beers.tests.factories import BeerFactory

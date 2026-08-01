@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from io import StringIO
 
-from beers.models import Beer
 from django.core.management import call_command
+
+from beers.models import Beer
 
 
 def _call_command_with_output(command: str, *args, **kwargs) -> str:

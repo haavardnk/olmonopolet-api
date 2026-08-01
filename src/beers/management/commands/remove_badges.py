@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from argparse import ArgumentParser
 
-from beers.models import Badge
 from django.core.management.base import BaseCommand
+
+from beers.models import Badge
 
 
 class Command(BaseCommand):

@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from beers.api.utils import sync_unmatched_checkins
 from django.core.management.base import BaseCommand
+
+from beers.api.utils import sync_unmatched_checkins
 
 
 class Command(BaseCommand):

@@ -1,4 +1,5 @@
 import pytest
+
 from beers.management.commands.update_breweries_from_untappd import Command
 from beers.tests.factories import BreweryFactory
 from clients.untappd import parsers

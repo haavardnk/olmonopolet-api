@@ -3,10 +3,11 @@ from __future__ import annotations
 import json
 from argparse import ArgumentParser
 
+from django.core.management.base import BaseCommand, CommandError
+
 from beers.models import UntappdList
 from beers.untappd_lists import sync_untappd_list
 from clients.untappd import UntappdClient
-from django.core.management.base import BaseCommand, CommandError
 
 
 class Command(BaseCommand):

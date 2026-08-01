@@ -5,6 +5,12 @@ from datetime import date
 
 import feedparser
 import requests as http_requests
+from django.contrib.auth.models import User
+from django.db import models
+from django_q.models import OrmQ, Task
+from drf_dynamic_fields import DynamicFieldsMixin
+from rest_framework import serializers
+
 from beers.models import (
     Badge,
     Beer,
@@ -18,11 +24,6 @@ from beers.models import (
     UserListItem,
     WrongMatch,
 )
-from django.contrib.auth.models import User
-from django.db import models
-from django_q.models import OrmQ, Task
-from drf_dynamic_fields import DynamicFieldsMixin
-from rest_framework import serializers
 
 from .utils import parse_bool
 

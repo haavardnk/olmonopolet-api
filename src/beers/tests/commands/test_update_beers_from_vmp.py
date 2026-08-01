@@ -2,13 +2,14 @@ import io
 
 import pytest
 import responses
+from django.core.management import call_command
+from django.core.management.base import CommandError
+from django.utils import timezone
+
 from beers.models import Beer, Country, ExternalAPI, VmpCrawlState
 from beers.vmp_commands import apply_product_fields, post_delivery, store_delivery
 from clients.vmp import circuit_breaker
 from clients.vmp.models import VmpProduct
-from django.core.management import call_command
-from django.core.management.base import CommandError
-from django.utils import timezone
 
 BEER_DATA = {
     "code": "9999",
