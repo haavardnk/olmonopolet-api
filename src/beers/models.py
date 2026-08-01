@@ -5,9 +5,35 @@ import requests
 from dirtyfields import DirtyFieldsMixin
 from django.core.validators import MaxValueValidator, MinValueValidator, URLValidator
 from django.db import models
+from django.db.models import Exists, F, OuterRef, Q, Value
 from django.db.models.deletion import CASCADE
+from django.db.models.functions import Greatest
 
 logger = logging.getLogger(__name__)
+
+
+class BeerQuerySet(models.QuerySet):
+    def with_user_tasted(self, user) -> "BeerQuerySet":
+        if user and user.is_authenticated:
+            return self.annotate(
+                user_tasted=Exists(
+                    Tasted.objects.filter(user=user, beer=OuterRef("pk"))
+                )
+            )
+        return self.annotate(user_tasted=Value(False))
+
+
+class StockQuerySet(models.QuerySet):
+    def stock_changes(self) -> "StockQuerySet":
+        return (
+            self.exclude(Q(stocked_at=None) & Q(unstocked_at=None))
+            .annotate(stock_unstock_at=Greatest("stocked_at", "unstocked_at"))
+            .order_by(
+                F("stock_unstock_at__date").desc(),
+                F("stocked_at").desc(nulls_last=True),
+                F("pk").asc(),
+            )
+        )
 
 
 class Option(models.Model):
@@ -50,6 +76,8 @@ class Brewery(models.Model):
 
 
 class Beer(DirtyFieldsMixin, models.Model):
+    objects = BeerQuerySet.as_manager()
+
     # Vinmonopolet info
     vmp_id = models.BigIntegerField(primary_key=True)
     vmp_name = models.CharField(max_length=150)
@@ -240,6 +268,8 @@ class Stock(models.Model):
     store = models.ForeignKey(Store, on_delete=models.CASCADE)
     beer = models.ForeignKey(Beer, on_delete=models.CASCADE, related_name="stock_set")
     quantity = models.IntegerField()
+
+    objects = StockQuerySet.as_manager()
 
     stock_updated = models.DateTimeField(auto_now=True)
     last_seen_in_stock_sync = models.DateTimeField(blank=True, null=True)
