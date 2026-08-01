@@ -554,7 +554,7 @@ class TestBarcodeLookup:
     def test_match_returns_beer(self) -> None:
         client = APIClient()
         beer = BeerFactory(vmp_id=3246802)
-        with patch("beers.api.views.VmpClient.from_external_api") as mock_factory:
+        with patch("beers.api.views.beer.VmpClient.from_external_api") as mock_factory:
             mock_factory.return_value.barcode_search.return_value = "3246802"
             response = client.get("/beers/barcode/?code=5410908000036")
         assert response.status_code == 200
@@ -562,14 +562,14 @@ class TestBarcodeLookup:
 
     def test_vmp_no_match_returns_404(self) -> None:
         client = APIClient()
-        with patch("beers.api.views.VmpClient.from_external_api") as mock_factory:
+        with patch("beers.api.views.beer.VmpClient.from_external_api") as mock_factory:
             mock_factory.return_value.barcode_search.return_value = None
             response = client.get("/beers/barcode/?code=5410908000036")
         assert response.status_code == 404
 
     def test_vmp_match_but_no_local_beer_returns_404(self) -> None:
         client = APIClient()
-        with patch("beers.api.views.VmpClient.from_external_api") as mock_factory:
+        with patch("beers.api.views.beer.VmpClient.from_external_api") as mock_factory:
             mock_factory.return_value.barcode_search.return_value = "3246802"
             response = client.get("/beers/barcode/?code=5410908000036")
         assert response.status_code == 404
@@ -584,14 +584,14 @@ class TestBarcodeLookup:
 
     def test_blocked_returns_503(self) -> None:
         client = APIClient()
-        with patch("beers.api.views.VmpClient.from_external_api") as mock_factory:
+        with patch("beers.api.views.beer.VmpClient.from_external_api") as mock_factory:
             mock_factory.return_value.barcode_search.side_effect = VmpBlockedError()
             response = client.get("/beers/barcode/?code=5410908000036")
         assert response.status_code == 503
 
     def test_api_error_returns_502(self) -> None:
         client = APIClient()
-        with patch("beers.api.views.VmpClient.from_external_api") as mock_factory:
+        with patch("beers.api.views.beer.VmpClient.from_external_api") as mock_factory:
             mock_factory.return_value.barcode_search.side_effect = VmpApiError()
             response = client.get("/beers/barcode/?code=5410908000036")
         assert response.status_code == 502
@@ -599,7 +599,7 @@ class TestBarcodeLookup:
     def test_positive_result_is_cached(self) -> None:
         client = APIClient()
         BeerFactory(vmp_id=3246802)
-        with patch("beers.api.views.VmpClient.from_external_api") as mock_factory:
+        with patch("beers.api.views.beer.VmpClient.from_external_api") as mock_factory:
             search = mock_factory.return_value.barcode_search
             search.return_value = "3246802"
             client.get("/beers/barcode/?code=5410908000036")
@@ -608,7 +608,7 @@ class TestBarcodeLookup:
 
     def test_negative_result_is_cached(self) -> None:
         client = APIClient()
-        with patch("beers.api.views.VmpClient.from_external_api") as mock_factory:
+        with patch("beers.api.views.beer.VmpClient.from_external_api") as mock_factory:
             search = mock_factory.return_value.barcode_search
             search.return_value = None
             client.get("/beers/barcode/?code=5410908000036")
@@ -618,7 +618,7 @@ class TestBarcodeLookup:
     def test_fields_param_trims_payload(self) -> None:
         client = APIClient()
         BeerFactory(vmp_id=3246802)
-        with patch("beers.api.views.VmpClient.from_external_api") as mock_factory:
+        with patch("beers.api.views.beer.VmpClient.from_external_api") as mock_factory:
             mock_factory.return_value.barcode_search.return_value = "3246802"
             response = client.get(
                 "/beers/barcode/?code=5410908000036&fields=vmp_id,vmp_name"
