@@ -6,11 +6,9 @@ from argparse import ArgumentParser
 from calendar import timegm
 from datetime import datetime, timezone
 
-import feedparser
-import requests
 from beers.api.utils import sync_unmatched_checkins
 from beers.models import UntappdCheckin, UntappdRssFeed
-from bs4 import BeautifulSoup
+from clients.untappd import UntappdClient
 from django.core.management.base import BaseCommand, CommandError
 
 
@@ -31,13 +29,12 @@ class Command(BaseCommand):
             self.stdout.write("No active RSS feeds found")
             return
 
-        scraper = requests.Session()
-        scraper.headers.update({"User-Agent": "Mozilla/5.0"})
+        client = UntappdClient()
         total_imported = 0
         failed = 0
 
         for feed_obj in feeds:
-            imported, ok = self._process_feed(feed_obj, scraper)
+            imported, ok = self._process_feed(feed_obj, client)
             total_imported += imported
             if not ok:
                 failed += 1
@@ -56,18 +53,18 @@ class Command(BaseCommand):
             )
 
     def _process_feed(
-        self, feed_obj: UntappdRssFeed, scraper: requests.Session
+        self, feed_obj: UntappdRssFeed, client: UntappdClient
     ) -> tuple[int, bool]:
         self.stdout.write(f"Processing feed for {feed_obj.user.username}")
 
-        parsed = feedparser.parse(feed_obj.feed_url)
-        if parsed.bozo and not parsed.entries:
+        entries = client.fetch_rss_entries(feed_obj.feed_url)
+        if entries is None:
             self.stdout.write(
                 self.style.ERROR(f"Failed to parse feed for {feed_obj.user.username}")
             )
             return 0, False
 
-        new_entries = self._filter_new_entries(parsed.entries)
+        new_entries = self._filter_new_entries(entries)
         if not new_entries:
             self.stdout.write(f"No new entries for {feed_obj.user.username}")
             feed_obj.last_synced = datetime.now(timezone.utc)
@@ -89,9 +86,7 @@ class Command(BaseCommand):
             pub_date = self._parse_pub_date(entry)
             title = entry.get("title", "")
 
-            beer_id, rating = self._scrape_checkin_page(
-                checkin_id, checkin_url, scraper
-            )
+            beer_id, rating = self._scrape_checkin_page(checkin_id, checkin_url, client)
             if beer_id:
                 self.stdout.write(f"  {title} -> {beer_id} (rating: {rating})")
                 self._save_checkin(
@@ -139,85 +134,14 @@ class Command(BaseCommand):
             return None
 
     def _scrape_checkin_page(
-        self, checkin_id: str, checkin_url: str, scraper: requests.Session
+        self, checkin_id: str, checkin_url: str, client: UntappdClient
     ) -> tuple[int | None, float | None]:
-        try:
-            response = scraper.get(checkin_url, timeout=15)
-            if response.status_code != 200:
-                self.stdout.write(
-                    self.style.ERROR(
-                        f"  HTTP {response.status_code} for checkin {checkin_id}"
-                    )
-                )
-                return None, None
-            soup = BeautifulSoup(response.text, "html.parser")
-        except Exception as e:
-            self.stdout.write(
-                self.style.ERROR(f"Error fetching checkin {checkin_id}: {e}")
-            )
+        checkin = client.get_checkin(checkin_url)
+        if checkin is None:
+            self.stdout.write(self.style.ERROR(f"Error fetching checkin {checkin_id}"))
             return None, None
 
-        return self._extract_beer_id(soup), self._extract_rating(soup)
-
-    def _extract_beer_id(self, soup: BeautifulSoup) -> int | None:
-        try:
-            beer_link = soup.find("a", {"class": "label"})
-            if beer_link and beer_link.get("href"):
-                href = str(beer_link["href"])
-                match = re.search(r"/beer/[^/]+/(\d+)", href)
-                if match:
-                    return int(match.group(1))
-                parts = href.rstrip("/").split("/")
-                if parts:
-                    return int(parts[-1])
-        except (ValueError, IndexError, AttributeError):
-            pass
-
-        try:
-            og_url = soup.find("meta", {"property": "og:url"})
-            if og_url and og_url.get("content"):
-                content = str(og_url["content"])
-                if "/beer/" in content:
-                    match = re.search(r"/beer/[^/]+/(\d+)", content)
-                    if match:
-                        return int(match.group(1))
-        except (ValueError, AttributeError):
-            pass
-
-        try:
-            beer_name_link = soup.select_one("p.beer-name a")
-            if beer_name_link and beer_name_link.get("href"):
-                href = str(beer_name_link["href"])
-                parts = href.rstrip("/").split("/")
-                if parts:
-                    return int(parts[-1])
-        except (ValueError, IndexError, AttributeError):
-            pass
-
-        return None
-
-    def _extract_rating(self, soup: BeautifulSoup) -> float | None:
-        try:
-            caps_elem = soup.find("div", {"class": "caps"})
-            if caps_elem and caps_elem.get("data-rating"):
-                val = float(str(caps_elem["data-rating"]))
-                if val > 0:
-                    return val
-        except (ValueError, AttributeError):
-            pass
-
-        try:
-            rating_elem = soup.select_one("span.rating")
-            if rating_elem:
-                match = re.search(r"[\d.]+", rating_elem.text)
-                if match:
-                    val = float(match.group())
-                    if val > 0:
-                        return val
-        except (ValueError, AttributeError):
-            pass
-
-        return None
+        return checkin.beer_id, checkin.rating
 
     def _save_checkin(
         self,

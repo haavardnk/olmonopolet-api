@@ -3,9 +3,9 @@ from __future__ import annotations
 import json
 from argparse import ArgumentParser
 
-import cloudscraper25
 from beers.models import UntappdList
 from beers.untappd_lists import sync_untappd_list
+from clients.untappd import UntappdClient
 from django.core.management.base import BaseCommand, CommandError
 
 
@@ -29,7 +29,7 @@ class Command(BaseCommand):
             self.stdout.write("No active Untappd lists found")
             return
 
-        scraper = cloudscraper25.create_scraper()
+        client = UntappdClient.from_options()
         total_synced = 0
         failed = 0
 
@@ -38,7 +38,7 @@ class Command(BaseCommand):
                 f"Syncing: {untappd_list.untappd_username}/{untappd_list.name}"
             )
             try:
-                count = sync_untappd_list(untappd_list, scraper)
+                count = sync_untappd_list(untappd_list, client)
                 total_synced += 1
                 self.stdout.write(f"  Found {count} beers")
             except Exception as e:

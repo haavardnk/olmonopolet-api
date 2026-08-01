@@ -1,13 +1,10 @@
 from __future__ import annotations
 
-import json
 from argparse import ArgumentParser
 from itertools import chain
 
-import cloudscraper25
 from beers.models import Brewery
-from bs4 import BeautifulSoup
-from cloudscraper25 import CloudScraper
+from clients.untappd import UntappdBrewery, UntappdClient
 from django.core.management.base import BaseCommand, CommandError
 from django.db.models import F
 from django.utils import timezone
@@ -19,13 +16,13 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options) -> None:
         breweries = self._get_prioritized_breweries()
-        scraper = cloudscraper25.create_scraper()
+        client = UntappdClient()
         updated = 0
         attempted = 0
 
         for brewery in breweries[: options["calls"]]:
             attempted += 1
-            if self._update_brewery_from_untappd(brewery, scraper):
+            if self._update_brewery_from_untappd(brewery, client):
                 updated += 1
 
         self.stdout.write(
@@ -53,77 +50,25 @@ class Command(BaseCommand):
         return breweries
 
     def _update_brewery_from_untappd(
-        self, brewery: Brewery, scraper: CloudScraper
+        self, brewery: Brewery, client: UntappdClient
     ) -> bool:
-        url = self._brewery_url(brewery)
+        url = brewery.untpd_url
         self.stdout.write(f"{brewery.id} {url}")
 
-        try:
-            response = scraper.get(
-                url, headers={"User-Agent": "Mozilla/5.0"}, timeout=30
-            )
-            soup = BeautifulSoup(response.text, "html.parser")
-        except Exception as e:
-            self.stdout.write(self.style.ERROR(f"Error fetching {url}: {e}"))
+        data = client.get_brewery(url)
+        if data is None:
+            self.stdout.write(self.style.ERROR(f"Error fetching {url}"))
             return False
 
-        self._update_brewery_fields(brewery, soup)
+        self._apply_fields(brewery, data)
         brewery.untpd_updated = timezone.now()
         brewery.save()
         return True
 
-    def _brewery_url(self, brewery: Brewery) -> str:
-        return brewery.untpd_url
-
-    def _extract_brewery_ld(self, soup: BeautifulSoup) -> dict | None:
-        scripts = soup.find_all("script", type="application/ld+json")
-        for script in scripts:
-            if not script.string:
-                continue
-            try:
-                data = json.loads(script.string)
-            except json.JSONDecodeError:
-                continue
-            if isinstance(data, dict) and data.get("@type") == "Brewery":
-                return data
-        return None
-
-    def _update_brewery_fields(self, brewery: Brewery, soup: BeautifulSoup) -> None:
-        data = self._extract_brewery_ld(soup)
-        if data:
-            name = data.get("name")
-            if name:
-                brewery.name = name
-            description = data.get("description")
-            if description:
-                brewery.description = description
-            image = self._extract_ld_image(data.get("image"))
-            if image:
-                brewery.label_url = self._normalize_url(image)
-
-        if not brewery.label_url:
-            logo = self._extract_logo(soup)
-            if logo:
-                brewery.label_url = logo
-
-    def _extract_ld_image(self, image: object) -> str | None:
-        if isinstance(image, dict):
-            return image.get("contentUrl") or image.get("url")
-        if isinstance(image, str):
-            return image
-        return None
-
-    def _extract_logo(self, soup: BeautifulSoup) -> str | None:
-        label_elem = soup.find("a", {"class": "label image-big"})
-        if label_elem:
-            data_image = label_elem.get("data-image")
-            if data_image:
-                return self._normalize_url(str(data_image))
-        return None
-
-    def _normalize_url(self, url: str) -> str:
-        return (
-            url.replace("://", "PLACEHOLDER")
-            .replace("//", "/")
-            .replace("PLACEHOLDER", "://")
-        )
+    def _apply_fields(self, brewery: Brewery, data: UntappdBrewery) -> None:
+        if data.name:
+            brewery.name = data.name
+        if data.description:
+            brewery.description = data.description
+        if data.label_url:
+            brewery.label_url = data.label_url

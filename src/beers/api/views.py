@@ -45,7 +45,7 @@ from beers.models import (
     WrongMatch,
 )
 from clients.patreon import fetch_patreon_posts
-from beers.untappd_lists import fetch_user_lists
+from clients.untappd import UntappdClient
 from clients.vmp import VmpApiError, VmpBlockedError, VmpClient
 from django.contrib.postgres.aggregates import ArrayAgg
 from django.core.cache import cache
@@ -612,7 +612,7 @@ class UntappdListViewSet(BrowsableMixin, ModelViewSet):
             return Response({"detail": "username parameter is required"}, status=400)
 
         try:
-            lists = fetch_user_lists(username)
+            lists = UntappdClient.from_options().fetch_user_lists(username)
         except ValueError as e:
             return Response({"detail": str(e)}, status=404)
         except Exception:

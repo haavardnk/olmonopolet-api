@@ -1,7 +1,7 @@
 import pytest
 from beers.management.commands.update_breweries_from_untappd import Command
 from beers.tests.factories import BreweryFactory
-from bs4 import BeautifulSoup
+from clients.untappd import parsers
 
 BREWERY_LD_HTML = """
 <script type="application/ld+json">
@@ -22,12 +22,11 @@ EMPTY_HTML = "<html><body></body></html>"
 
 
 @pytest.mark.django_db
-class TestUpdateBreweryFields:
+class TestApplyFields:
     def test_parses_json_ld(self) -> None:
         brewery = BreweryFactory(name=None, description=None)
-        soup = BeautifulSoup(BREWERY_LD_HTML, "html.parser")
 
-        Command()._update_brewery_fields(brewery, soup)
+        Command()._apply_fields(brewery, parsers.parse_brewery(BREWERY_LD_HTML))
 
         assert brewery.name == "Lervig"
         assert brewery.description == "Craft brewery"
@@ -35,17 +34,17 @@ class TestUpdateBreweryFields:
 
     def test_parses_image_object(self) -> None:
         brewery = BreweryFactory(name=None)
-        soup = BeautifulSoup(BREWERY_LD_IMAGE_OBJECT_HTML, "html.parser")
 
-        Command()._update_brewery_fields(brewery, soup)
+        Command()._apply_fields(
+            brewery, parsers.parse_brewery(BREWERY_LD_IMAGE_OBJECT_HTML)
+        )
 
         assert brewery.label_url == "https://untappd.com/logos/brewery-12345.jpeg"
 
     def test_does_not_overwrite_with_empty(self) -> None:
         brewery = BreweryFactory(name="Existing", description="Existing desc")
-        soup = BeautifulSoup(EMPTY_HTML, "html.parser")
 
-        Command()._update_brewery_fields(brewery, soup)
+        Command()._apply_fields(brewery, parsers.parse_brewery(EMPTY_HTML))
 
         assert brewery.name == "Existing"
         assert brewery.description == "Existing desc"

@@ -1,17 +1,14 @@
 from __future__ import annotations
 
-import json
-import re
 from argparse import ArgumentParser
 from datetime import timedelta
 from itertools import chain
 
-import cloudscraper25
-from beers.models import Beer, Brewery
-from bs4 import BeautifulSoup
-from cloudscraper25 import CloudScraper
+from clients.untappd import UntappdBeer, UntappdClient
 from django.core.management.base import BaseCommand, CommandError
 from django.utils import timezone
+
+from beers.models import Beer, Brewery
 
 
 class Command(BaseCommand):
@@ -20,13 +17,13 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options) -> None:
         beers = self._get_prioritized_beers()
-        scraper = cloudscraper25.create_scraper()
+        client = UntappdClient()
         updated = 0
         attempted = 0
 
         for beer in beers[: options["calls"]]:
             attempted += 1
-            if self._update_beer_from_untappd(beer, scraper):
+            if self._update_beer_from_untappd(beer, client):
                 updated += 1
 
         self.stdout.write(
@@ -64,7 +61,7 @@ class Command(BaseCommand):
 
         return beers
 
-    def _update_beer_from_untappd(self, beer: Beer, scraper: CloudScraper) -> bool:
+    def _update_beer_from_untappd(self, beer: Beer, client: UntappdClient) -> bool:
         url = beer.untpd_url
         if not url:
             self.stdout.write(self.style.ERROR(f"No URL for beer: {beer.vmp_name}"))
@@ -72,160 +69,42 @@ class Command(BaseCommand):
 
         self.stdout.write(f"{beer.vmp_name} {url}")
 
-        try:
-            response = scraper.get(
-                url, headers={"User-Agent": "Mozilla/5.0"}, timeout=30
-            )
-            soup = BeautifulSoup(response.text, "html.parser")
-            json_ld_data = self._extract_json_ld_data(soup)
-
-        except Exception as e:
-            self.stdout.write(self.style.ERROR(f"Error fetching {url}: {e}"))
+        data = client.get_beer(url)
+        if data is None:
+            self.stdout.write(self.style.ERROR(f"Error fetching {url}"))
             return False
 
-        # Update beer data
-        self._update_beer_fields(beer, soup, json_ld_data)
+        self._apply_fields(beer, data)
         beer.untpd_updated = timezone.now()
         beer.prioritize_recheck = False
-
         beer.save()
         return True
 
-    def _extract_json_ld_data(self, soup: BeautifulSoup) -> list[dict]:
-        try:
-            scripts = soup.find_all("script", type="application/ld+json")
-            return [json.loads(script.string) for script in scripts if script.string]
-        except (json.JSONDecodeError, AttributeError):
-            return []
+    def _apply_fields(self, beer: Beer, data: UntappdBeer) -> None:
+        beer.untpd_id = data.untpd_id or beer.untpd_id
+        beer.untpd_name = data.name or beer.untpd_name
+        beer.untpd_url = data.untpd_url or beer.untpd_url
+        beer.description = data.description or beer.description
+        beer.ibu = data.ibu
+        if data.rating is not None:
+            beer.rating = data.rating
+        if data.checkins is not None:
+            beer.checkins = data.checkins
+        if data.style is not None:
+            beer.style = data.style
+        if data.abv is not None:
+            beer.abv = data.abv
+        if data.label_hd_url:
+            beer.label_hd_url = data.label_hd_url
+        if data.label_sm_url:
+            beer.label_sm_url = data.label_sm_url
+        self._link_brewery(beer, data)
 
-    def _update_beer_fields(
-        self, beer: Beer, soup: BeautifulSoup, json_ld_data: list[dict]
-    ) -> None:
-        if json_ld_data:
-            data = json_ld_data[0]
-            beer.untpd_id = data.get("sku", beer.untpd_id)
-            beer.untpd_name = data.get("name", beer.untpd_name)
-            beer.rating = data.get("aggregateRating", {}).get(
-                "ratingValue", beer.rating
-            )
-            beer.checkins = data.get("aggregateRating", {}).get(
-                "reviewCount", beer.checkins
-            )
-            beer.description = data.get("description", beer.description)
-        else:
-            self._update_from_html_fallback(beer, soup)
-
-        self._link_brewery(beer, soup)
-        self._extract_html_only_fields(beer, soup)
-
-    def _link_brewery(self, beer: Beer, soup: BeautifulSoup) -> None:
-        anchor = soup.select_one("p.brewery a")
-        if not anchor:
+    def _link_brewery(self, beer: Beer, data: UntappdBeer) -> None:
+        if not data.brewery_url:
             return
-        href = str(anchor.get("href") or "")
-        if not href:
-            return
-        untpd_url = href if href.startswith("http") else f"https://untappd.com{href}"
-        name = anchor.text.strip() or None
         brewery, _ = Brewery.objects.get_or_create(
-            untpd_url=untpd_url,
-            defaults={"name": name},
+            untpd_url=data.brewery_url,
+            defaults={"name": data.brewery_name},
         )
         beer.brewery = brewery
-
-    def _update_from_html_fallback(self, beer: Beer, soup: BeautifulSoup) -> None:
-        try:
-            og_url = soup.find("meta", {"property": "og:url"})
-            if og_url and og_url.get("content"):
-                content = str(og_url["content"])
-                beer.untpd_id = int(content.split("/")[-1])
-        except (AttributeError, ValueError, IndexError):
-            pass
-
-        try:
-            brewery_elem = soup.find("p", {"class": "brewery"})
-            name_elem = soup.find("div", {"class": "name"})
-            if brewery_elem and name_elem:
-                brewery_link = brewery_elem.find("a")
-                name_header = name_elem.find("h1")
-                brewery_text = brewery_link.text if brewery_link else ""
-                name_text = name_header.text if name_header else ""
-                beer.untpd_name = f"{brewery_text} {name_text}".strip()
-        except AttributeError:
-            pass
-
-        try:
-            caps_elem = soup.find("div", {"class": "caps"})
-            if caps_elem and caps_elem.get("data-rating"):
-                rating_value = str(caps_elem["data-rating"])
-                beer.rating = float(rating_value)
-        except (AttributeError, ValueError):
-            pass
-
-        try:
-            raters_elem = soup.find("p", {"class": "raters"})
-            if raters_elem:
-                checkins_match = re.findall(r"\b\d+\b", raters_elem.text)
-                if checkins_match:
-                    beer.checkins = int(checkins_match[0])
-        except (AttributeError, ValueError, IndexError):
-            pass
-
-        try:
-            desc_elem = soup.find("div", {"class": "beer-descrption-read-less"})
-            if desc_elem:
-                beer.description = desc_elem.text.strip()
-        except AttributeError:
-            pass
-
-    def _extract_html_only_fields(self, beer: Beer, soup: BeautifulSoup) -> None:
-        try:
-            style_elem = soup.find("p", {"class": "style"})
-            if style_elem:
-                beer.style = style_elem.text.strip()
-        except AttributeError:
-            pass
-
-        try:
-            abv_elem = soup.find("p", {"class": "abv"})
-            if abv_elem:
-                abv_numbers = re.findall(r"\d+\.?\d*", abv_elem.text)
-                beer.abv = float(abv_numbers[0]) if abv_numbers else 0
-        except (AttributeError, ValueError, IndexError):
-            beer.abv = 0
-
-        try:
-            ibu_elem = soup.find("p", {"class": "ibu"})
-            if ibu_elem:
-                ibu_numbers = re.findall(r"\b\d+\b", ibu_elem.text)
-                beer.ibu = int(ibu_numbers[0]) if ibu_numbers else None
-        except (AttributeError, ValueError, IndexError):
-            beer.ibu = None
-
-        try:
-            label_elem = soup.find("a", {"class": "label image-big"})
-            if label_elem:
-                data_image = label_elem.get("data-image")
-                if data_image:
-                    beer.label_hd_url = (
-                        str(data_image)
-                        .replace("://", "PLACEHOLDER")
-                        .replace("//", "/")
-                        .replace("PLACEHOLDER", "://")
-                    )
-                img_elem = label_elem.find("img")
-                if img_elem:
-                    src = img_elem.get("src")
-                    if src:
-                        beer.label_sm_url = str(src)
-        except AttributeError:
-            pass
-
-        try:
-            og_url_elem = soup.find("meta", {"property": "og:url"})
-            if og_url_elem:
-                content = og_url_elem.get("content")
-                if content:
-                    beer.untpd_url = str(content)
-        except AttributeError:
-            pass
