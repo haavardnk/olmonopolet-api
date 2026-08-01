@@ -58,6 +58,7 @@ from beers.api.serializers import (
     UserListSerializer,
     UserListUpdateSerializer,
     WrongMatchSerializer,
+    prime_user_list_context,
 )
 from beers.api.utils import bulk_import_tasted, parse_untappd_file
 from beers.models import (
@@ -123,6 +124,7 @@ class BeerViewSet(BrowsableMixin, ModelViewSet):
         "tasted__rating",
     ]
     filterset_class = BeerFilter
+    ordering = ["pk"]
 
     def get_queryset(self) -> QuerySet[Beer]:
         queryset = Beer.objects.all()
@@ -419,33 +421,43 @@ class UserListViewSet(BrowsableMixin, ModelViewSet):
         )
 
     def list(self, request, *args, **kwargs):
-        owned = self.get_queryset()
+        owned = list(self.get_queryset())
+        followed = self._followed_lists(request.user)
+
         context = self.get_serializer_context()
+        prime_user_list_context(context, owned + followed)
+
         owned_data = [
             dict(item)
             for item in UserListSerializer(owned, many=True, context=context).data
         ]
-
-        followed_entries = FollowedList.objects.filter(user=request.user)
-        followed_data = []
         max_sort = max((item["sort_order"] for item in owned_data), default=0)
-        for i, entry in enumerate(followed_entries):
-            user_list = (
-                UserList.objects.filter(share_token=entry.share_token)
-                .select_related("untappd_list", "user")
-                .prefetch_related("items")
-                .first()
+
+        followed_data = []
+        for i, user_list in enumerate(followed):
+            item = dict(UserListSerializer(user_list, context=context).data)
+            item["is_followed"] = True
+            item["sort_order"] = max_sort + 1 + i
+            item["user_name"] = (
+                user_list.user.get_full_name() or user_list.user.username
             )
-            if user_list:
-                item = dict(UserListSerializer(user_list, context=context).data)
-                item["is_followed"] = True
-                item["sort_order"] = max_sort + 1 + i
-                item["user_name"] = (
-                    user_list.user.get_full_name() or user_list.user.username
-                )
-                followed_data.append(item)
+            followed_data.append(item)
 
         return Response(owned_data + followed_data)
+
+    def _followed_lists(self, user) -> list[UserList]:
+        tokens = list(
+            FollowedList.objects.filter(user=user).values_list("share_token", flat=True)
+        )
+        if not tokens:
+            return []
+        by_token = {
+            user_list.share_token: user_list
+            for user_list in UserList.objects.filter(share_token__in=tokens)
+            .select_related("untappd_list", "user")
+            .prefetch_related("items")
+        }
+        return [by_token[token] for token in tokens if token in by_token]
 
     def perform_create(self, serializer):
         max_sort = (

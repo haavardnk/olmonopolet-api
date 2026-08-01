@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Sequence
 from datetime import date
 
 import feedparser
 import requests as http_requests
-from django.db import models
 from django_q.models import OrmQ, Task
 from drf_dynamic_fields import DynamicFieldsMixin
 from rest_framework import serializers
@@ -302,6 +302,61 @@ class UserListItemUpdateSerializer(serializers.ModelSerializer):
         return value
 
 
+def build_price_map(user_lists: Sequence[UserList]) -> dict[str, float]:
+    product_ids = {
+        item.product_id for user_list in user_lists for item in user_list.items.all()
+    }
+    if not product_ids:
+        return {}
+    return {
+        str(vmp_id): price
+        for vmp_id, price in Beer.objects.filter(vmp_id__in=product_ids).values_list(
+            "vmp_id", "price"
+        )
+    }
+
+
+def build_untappd_vmp_map(user_lists: Sequence[UserList]) -> dict[int, int]:
+    beer_ids = {
+        beer_id
+        for user_list in user_lists
+        if user_list.untappd_list
+        for beer_id in user_list.untappd_list.untappd_beer_ids or []
+    }
+    if not beer_ids:
+        return {}
+    return dict(
+        Beer.objects.filter(untpd_id__in=beer_ids).values_list("untpd_id", "vmp_id")
+    )
+
+
+def build_sync_status_map(user_lists: Sequence[UserList]) -> dict[str, str]:
+    task_ids = {
+        user_list.untappd_list.sync_task_id
+        for user_list in user_lists
+        if user_list.untappd_list and user_list.untappd_list.sync_task_id
+    }
+    if not task_ids:
+        return {}
+    finished = {
+        task_id: "success" if success else "failed"
+        for task_id, success in Task.objects.filter(id__in=task_ids).values_list(
+            "id", "success"
+        )
+    }
+    queued = set(OrmQ.objects.filter(key__in=task_ids).values_list("key", flat=True))
+    return {
+        task_id: finished.get(task_id) or ("queued" if task_id in queued else "running")
+        for task_id in task_ids
+    }
+
+
+def prime_user_list_context(context: dict, user_lists: Sequence[UserList]) -> None:
+    context["price_map"] = build_price_map(user_lists)
+    context["untappd_vmp_map"] = build_untappd_vmp_map(user_lists)
+    context["sync_status_map"] = build_sync_status_map(user_lists)
+
+
 class UserListMethodsMixin:
     def _untappd_product_ids(self, obj: UserList) -> list[str] | None:
         if not obj.untappd_list:
@@ -309,9 +364,9 @@ class UserListMethodsMixin:
         beer_ids = obj.untappd_list.untappd_beer_ids or []
         if not beer_ids:
             return []
-        matched = dict(
-            Beer.objects.filter(untpd_id__in=beer_ids).values_list("untpd_id", "vmp_id")
-        )
+        matched = self.context.get("untappd_vmp_map")
+        if matched is None:
+            matched = build_untappd_vmp_map([obj])
         seen: set[str] = set()
         result: list[str] = []
         for bid in beer_ids:
@@ -325,17 +380,21 @@ class UserListMethodsMixin:
             result.append(pid)
         return result
 
+    def _prices(self, obj: UserList) -> dict[str, float]:
+        cached = self.context.get("price_map")
+        return cached if cached is not None else build_price_map([obj])
+
     def get_item_count(self, obj: UserList) -> int:
         untappd_ids = self._untappd_product_ids(obj)
         if untappd_ids is not None:
             return len(untappd_ids)
-        return obj.items.aggregate(total=models.Sum("quantity"))["total"] or 0
+        return sum(item.quantity for item in obj.items.all())
 
     def get_product_ids(self, obj: UserList) -> list[str]:
         untappd_ids = self._untappd_product_ids(obj)
         if untappd_ids is not None:
             return untappd_ids
-        return list(obj.items.values_list("product_id", flat=True))
+        return [item.product_id for item in obj.items.all()]
 
     def get_is_past(self, obj: UserList) -> bool | None:
         if not obj.event_date:
@@ -346,8 +405,8 @@ class UserListMethodsMixin:
         if not obj.show_vintage:
             return None
 
-        items = obj.items.all()
-        if not items.exists():
+        items = list(obj.items.all())
+        if not items:
             return {
                 "total_bottles": 0,
                 "total_value": 0,
@@ -355,23 +414,17 @@ class UserListMethodsMixin:
                 "newest_year": None,
             }
 
-        total_bottles = items.aggregate(total=models.Sum("quantity"))["total"] or 0
-        years = items.exclude(year__isnull=True).values_list("year", flat=True)
-
-        product_ids = [item.product_id for item in items]
-        prices = {
-            str(vmp_id): price
-            for vmp_id, price in Beer.objects.filter(
-                vmp_id__in=product_ids
-            ).values_list("vmp_id", "price")
-        }
-        total_value = sum(
-            item.quantity * (prices.get(item.product_id) or 0) for item in items
-        )
+        years = [item.year for item in items if item.year is not None]
+        prices = self._prices(obj)
 
         return {
-            "total_bottles": total_bottles,
-            "total_value": round(total_value, 2),
+            "total_bottles": sum(item.quantity for item in items),
+            "total_value": round(
+                sum(
+                    item.quantity * (prices.get(item.product_id) or 0) for item in items
+                ),
+                2,
+            ),
             "oldest_year": min(years) if years else None,
             "newest_year": max(years) if years else None,
         }
@@ -380,18 +433,14 @@ class UserListMethodsMixin:
         if not obj.show_store:
             return None
 
-        items = list(obj.items.all())
-        product_ids = [item.product_id for item in items]
-        prices = {
-            str(vmp_id): price
-            for vmp_id, price in Beer.objects.filter(
-                vmp_id__in=product_ids
-            ).values_list("vmp_id", "price")
-        }
-        total = sum(
-            item.quantity * (prices.get(item.product_id) or 0) for item in items
+        prices = self._prices(obj)
+        return round(
+            sum(
+                item.quantity * (prices.get(item.product_id) or 0)
+                for item in obj.items.all()
+            ),
+            2,
         )
-        return round(total, 2)
 
     def get_is_read_only(self, obj: UserList) -> bool:
         return obj.untappd_list_id is not None
@@ -470,12 +519,10 @@ class UserListSerializer(UserListMethodsMixin, serializers.ModelSerializer):
         task_id = obj.untappd_list.sync_task_id
         if not task_id:
             return None
-        task = Task.objects.filter(id=task_id).first()
-        if task:
-            return "failed" if not task.success else "success"
-        if OrmQ.objects.filter(key=task_id).exists():
-            return "queued"
-        return "running"
+        statuses = self.context.get("sync_status_map")
+        if statuses is None:
+            statuses = build_sync_status_map([obj])
+        return statuses.get(task_id)
 
     def get_items(self, obj: UserList):
         if not self.context.get("include_items", False):

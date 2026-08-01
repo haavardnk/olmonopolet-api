@@ -3,6 +3,8 @@ from unittest.mock import patch
 
 import pytest
 from django.core.cache import cache
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient
@@ -173,6 +175,27 @@ class TestReleaseViewSet:
 
 @pytest.mark.django_db
 class TestUserListViewSet:
+    def test_list_query_count_is_constant(self, auth_client: tuple) -> None:
+        client, user = auth_client
+
+        def add_list(index: int) -> None:
+            user_list = UserList.objects.create(
+                user=user, name=f"List {index}", sort_order=index, show_store=True
+            )
+            UserListItem.objects.create(
+                list=user_list, product_id=str(BeerFactory().vmp_id), sort_order=1
+            )
+
+        add_list(1)
+        with CaptureQueriesContext(connection) as first:
+            client.get("/lists/")
+
+        add_list(2)
+        with CaptureQueriesContext(connection) as second:
+            client.get("/lists/")
+
+        assert len(second) == len(first)
+
     def test_sort_order_auto_increments(self, auth_client: tuple) -> None:
         client, user = auth_client
         client.post("/lists/", {"name": "First"})
