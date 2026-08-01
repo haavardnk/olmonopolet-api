@@ -5,8 +5,8 @@ from argparse import ArgumentParser
 from django.core.management.base import CommandError
 from django.utils import timezone
 
+from beers.management.commands._vmp import VmpCommand
 from beers.models import Beer
-from beers.vmp_commands import VmpCommand
 from clients.vmp import VmpApiError
 from clients.vmp.models import VmpProductDetail
 

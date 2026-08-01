@@ -6,8 +6,8 @@ from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.utils import timezone
 
+from beers.management.commands._vmp import apply_product_fields
 from beers.models import Beer, Country, ExternalAPI, VmpCrawlState
-from beers.vmp_commands import apply_product_fields
 from clients.vmp import circuit_breaker
 from clients.vmp.models import VmpProduct
 

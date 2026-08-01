@@ -10,8 +10,8 @@ from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 
+from beers.management.commands._vmp import CATEGORIES, VmpCommand
 from beers.models import Beer, Stock, Store
-from beers.vmp_commands import CATEGORIES, VmpCommand
 from clients.vmp import VmpApiError, VmpBlockedError, VmpClient, circuit_breaker
 from clients.vmp.models import VmpProduct
 

@@ -6,8 +6,8 @@ from django.core.management.base import CommandError
 from django.db import transaction
 from django.utils import timezone
 
+from beers.management.commands._vmp import CATEGORIES, VmpCommand, apply_product_fields
 from beers.models import Beer, VmpCrawlState
-from beers.vmp_commands import CATEGORIES, VmpCommand, apply_product_fields
 from clients.vmp import VmpBlockedError, circuit_breaker
 from clients.vmp.models import VmpProduct
 
