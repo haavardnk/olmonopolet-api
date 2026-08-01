@@ -7,6 +7,7 @@ from clients.untappd import (
     UntappdClient,
     UntappdCookieExpired,
     UntappdListNotFound,
+    UntappdUserNotFound,
     generate_query_variations,
 )
 
@@ -123,9 +124,9 @@ class TestFetchUserLists:
             client.fetch_user_lists("testuser")
 
     @responses.activate
-    def test_missing_user_raises_value_error(self, client: UntappdClient) -> None:
+    def test_missing_user_raises(self, client: UntappdClient) -> None:
         responses.add(responses.GET, f"{UNTAPPD_BASE}/user/nope/lists", status=404)
-        with pytest.raises(ValueError):
+        with pytest.raises(UntappdUserNotFound):
             client.fetch_user_lists("nope")
 
 
@@ -159,6 +160,17 @@ class TestFetchListBeerIds:
         )
         with pytest.raises(UntappdListNotFound):
             client.fetch_list_beer_ids("testuser", 9)
+
+    @responses.activate
+    def test_login_redirect_raises_cookie_expired(self, client: UntappdClient) -> None:
+        responses.add(
+            responses.GET,
+            f"{UNTAPPD_BASE}/user/testuser/lists/1",
+            body=LOGIN_HTML,
+            status=200,
+        )
+        with pytest.raises(UntappdCookieExpired):
+            client.fetch_list_beer_ids("testuser", 1)
 
     @responses.activate
     def test_wishlist_paginates_until_total(self, client: UntappdClient) -> None:

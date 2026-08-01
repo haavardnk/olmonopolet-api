@@ -30,7 +30,7 @@ from rest_framework.mixins import CreateModelMixin
 from rest_framework.renderers import BrowsableAPIRenderer
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.viewsets import GenericViewSet, ModelViewSet
+from rest_framework.viewsets import GenericViewSet, ModelViewSet, ReadOnlyModelViewSet
 
 from beers.api.filters import (
     BeerFilter,
@@ -75,7 +75,7 @@ from beers.models import (
     WrongMatch,
 )
 from clients.patreon import fetch_patreon_posts
-from clients.untappd import UntappdClient
+from clients.untappd import UntappdClient, UntappdUserNotFound
 from clients.vmp import VmpApiError, VmpBlockedError, VmpClient
 
 PUBLIC_CACHE_SECONDS = 60 * 15
@@ -309,7 +309,7 @@ class WrongMatchViewSet(BrowsableMixin, CreateModelMixin, GenericViewSet):
 
 
 @method_decorator(cache_page(PUBLIC_CACHE_SECONDS), name="dispatch")
-class ReleaseViewSet(BrowsableMixin, ModelViewSet):
+class ReleaseViewSet(BrowsableMixin, ReadOnlyModelViewSet):
     serializer_class = ReleaseSerializer
     pagination_class = Pagination
     permission_classes = [permissions.AllowAny]
@@ -357,7 +357,7 @@ class ReleaseViewSet(BrowsableMixin, ModelViewSet):
 
 
 @method_decorator(cache_page(PUBLIC_CACHE_SECONDS), name="dispatch")
-class CountryViewSet(BrowsableMixin, ModelViewSet):
+class CountryViewSet(BrowsableMixin, ReadOnlyModelViewSet):
     queryset = Country.objects.all().order_by("name")
     serializer_class = CountrySerializer
     permission_classes = [permissions.AllowAny]
@@ -614,7 +614,7 @@ class UntappdListViewSet(BrowsableMixin, ModelViewSet):
 
         try:
             lists = UntappdClient.from_options().fetch_user_lists(username)
-        except ValueError as e:
+        except UntappdUserNotFound as e:
             return Response({"detail": str(e)}, status=404)
         except Exception:
             return Response(

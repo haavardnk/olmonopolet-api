@@ -6,14 +6,26 @@ from pathlib import Path
 import firebase_admin
 import sentry_sdk
 from corsheaders.defaults import default_headers
+from django.core.exceptions import ImproperlyConfigured
 from firebase_admin import credentials
 from sentry_sdk.integrations.django import DjangoIntegration
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "dummykey")
 DEBUG = int(os.getenv("DEBUG_VALUE", 1))
 TESTING = "pytest" in sys.modules
 DEFAULT_AUTO_FIELD = "django.db.models.AutoField"
+
+
+def env_secret(name: str, dev_default: str) -> str:
+    value = os.getenv(name)
+    if value:
+        return value
+    if not (DEBUG or TESTING):
+        raise ImproperlyConfigured(f"{name} must be set")
+    return dev_default
+
+
+SECRET_KEY = env_secret("DJANGO_SECRET_KEY", "dummykey")
 
 VMP_PROXY = os.getenv("VMP_PROXY")
 REDIS_URL = os.getenv("REDIS_URL")
@@ -78,7 +90,7 @@ DATABASES = {
         ),
         "NAME": os.getenv("DATABASE_NAME", "beerdb"),
         "USER": os.getenv("DATABASE_USERNAME", "beer"),
-        "PASSWORD": os.getenv("DATABASE_PASSWORD", "123123"),
+        "PASSWORD": env_secret("DATABASE_PASSWORD", "123123"),
         "HOST": os.getenv("DATABASE_HOST", "127.0.0.1"),
         "PORT": os.getenv("DATABASE_PORT", 5432),
         "OPTIONS": json.loads(os.getenv("DATABASE_OPTIONS", "{}")),

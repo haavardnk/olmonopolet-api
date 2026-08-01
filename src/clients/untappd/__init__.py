@@ -6,6 +6,7 @@ from clients.untappd.client import (
     UntappdCookieExpired,
     UntappdError,
     UntappdListNotFound,
+    UntappdUserNotFound,
     generate_query_variations,
 )
 from clients.untappd.models import (
@@ -27,5 +28,6 @@ __all__ = [
     "UntappdListInfo",
     "UntappdListNotFound",
     "UntappdSearchResult",
+    "UntappdUserNotFound",
     "generate_query_variations",
 ]

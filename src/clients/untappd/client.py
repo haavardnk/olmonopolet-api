@@ -43,6 +43,10 @@ class UntappdListNotFound(UntappdError):
     pass
 
 
+class UntappdUserNotFound(UntappdError):
+    pass
+
+
 def generate_query_variations(beer_name: str) -> list[str]:
     variations = [beer_name]
 
@@ -115,9 +119,11 @@ class UntappdClient:
         )
 
         if response.status_code == 404:
-            raise ValueError(f"Untappd user '{username}' not found")
+            raise UntappdUserNotFound(f"Untappd user '{username}' not found")
         if "set their account to be private" in response.text:
-            raise ValueError(f"Untappd user '{username}' has a private profile")
+            raise UntappdUserNotFound(
+                f"Untappd user '{username}' has a private profile"
+            )
         self._check_cookie(response, "user lists fetch")
 
         response.raise_for_status()
@@ -171,8 +177,7 @@ class UntappdClient:
                 f"List {list_id} for user '{username}' is not accessible"
             )
         if self._cookie_expired(response):
-            self._expired_cookie_error("list fetch")
-            return []
+            raise self._expired_cookie_error("list fetch")
 
         return parsers.parse_beer_ids(response.text)
 
