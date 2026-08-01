@@ -23,6 +23,9 @@ ENTRYPOINT []
 
 RUN chmod +x run.sh
 
+RUN useradd --create-home --uid 1000 app && chown -R app:app /app
+USER app
+
 EXPOSE 7000
 
 CMD ./run.sh
