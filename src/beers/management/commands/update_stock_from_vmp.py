@@ -246,7 +246,7 @@ class Command(VmpCommand):
             return 0, 1
 
     def _unstock_missing_beers(self, store: Store) -> int:
-        stocks_to_unstock = (
+        stocks_to_unstock = list(
             Stock.objects.filter(store=store)
             .exclude(quantity=0)
             .filter(
@@ -255,11 +255,14 @@ class Command(VmpCommand):
             )
         )
 
-        count = stocks_to_unstock.count()
-
+        now = timezone.now()
         for stock in stocks_to_unstock:
             stock.quantity = 0
-            stock.unstocked_at = timezone.now()
-            stock.save()
+            stock.unstocked_at = now
+            stock.stock_updated = now
 
-        return count
+        Stock.objects.bulk_update(
+            stocks_to_unstock, ["quantity", "unstocked_at", "stock_updated"]
+        )
+
+        return len(stocks_to_unstock)

@@ -38,11 +38,13 @@ class Command(BaseCommand):
         )
 
     def _create_unreleased_products(self, products: str) -> int:
-        created_count = 0
-        for product_id in products.split(","):
-            VmpNotReleased.objects.create(id=int(product_id.strip()))
-            created_count += 1
-        return created_count
+        created = VmpNotReleased.objects.bulk_create(
+            [
+                VmpNotReleased(id=int(product_id.strip()))
+                for product_id in products.split(",")
+            ]
+        )
+        return len(created)
 
     def _schedule_tasks(
         self,
@@ -54,57 +56,44 @@ class Command(BaseCommand):
         created_count: int,
     ) -> None:
         now = timezone.now()
+        tasks = [
+            (
+                "Get beers from vmp",
+                "beers.tasks.get_unreleased_beers_from_vmp",
+                None,
+                now,
+            ),
+            (
+                "Add release model",
+                "beers.tasks.create_release",
+                f"products='{products}', name='{name}'",
+                now + timedelta(minutes=10),
+            ),
+            (
+                "Add badges",
+                "beers.tasks.create_badges_custom",
+                f"products='{products}', badge_text='{badge_text}', badge_type='{badge_type}'",
+                now + timedelta(minutes=10),
+            ),
+            (
+                "Remove badges",
+                "beers.tasks.remove_badges",
+                f"badge_type='{badge_type}'",
+                now + timedelta(days=days),
+            ),
+            (
+                "Update Untappd",
+                "beers.tasks.update_beers_from_untappd",
+                f"calls={created_count}",
+                now + timedelta(minutes=5),
+            ),
+        ]
 
-        self._schedule_get_beers_task(badge_text, now)
-        self._schedule_release_model_task(name, products, badge_text, now)
-        self._schedule_badges_tasks(products, badge_text, badge_type, days, now)
-        self._schedule_untappd_updates(badge_text, created_count, now)
-
-    def _schedule_get_beers_task(self, badge_text: str, now) -> None:
-        Schedule.objects.create(
-            name=f"Release: {badge_text} - Get beers from vmp",
-            func="beers.tasks.get_unreleased_beers_from_vmp",
-            schedule_type=Schedule.ONCE,
-            next_run=now,
-        )
-
-    def _schedule_release_model_task(
-        self, name: str, products: str, badge_text: str, now
-    ) -> None:
-        Schedule.objects.create(
-            name=f"Release: {badge_text} - Add release model",
-            func="beers.tasks.create_release",
-            kwargs=f"products='{products}', name='{name}'",
-            schedule_type=Schedule.ONCE,
-            next_run=now + timedelta(minutes=10),
-        )
-
-    def _schedule_badges_tasks(
-        self, products: str, badge_text: str, badge_type: str, days: int, now
-    ) -> None:
-        Schedule.objects.create(
-            name=f"Release: {badge_text} - Add badges",
-            func="beers.tasks.create_badges_custom",
-            kwargs=f"products='{products}', badge_text='{badge_text}', badge_type='{badge_type}'",
-            schedule_type=Schedule.ONCE,
-            next_run=now + timedelta(minutes=10),
-        )
-
-        Schedule.objects.create(
-            name=f"Release: {badge_text} - Remove badges",
-            func="beers.tasks.remove_badges",
-            kwargs=f"badge_type='{badge_type}'",
-            schedule_type=Schedule.ONCE,
-            next_run=now + timedelta(days=days),
-        )
-
-    def _schedule_untappd_updates(
-        self, badge_text: str, created_count: int, now
-    ) -> None:
-        Schedule.objects.create(
-            name=f"Release: {badge_text} - Update Untappd",
-            func="beers.tasks.update_beers_from_untappd",
-            kwargs=f"calls={created_count}",
-            schedule_type=Schedule.ONCE,
-            next_run=now + timedelta(minutes=5),
-        )
+        for label, func, kwargs, next_run in tasks:
+            Schedule.objects.create(
+                name=f"Release: {badge_text} - {label}",
+                func=func,
+                kwargs=kwargs,
+                schedule_type=Schedule.ONCE,
+                next_run=next_run,
+            )

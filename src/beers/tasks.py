@@ -113,7 +113,7 @@ def create_badges_untpd() -> str:
     return _call_command_with_output("create_badges_untpd")
 
 
-def create_badges_custom(products: list[int], badge_text: str, badge_type: str) -> str:
+def create_badges_custom(products: str, badge_text: str, badge_type: str) -> str:
     return _call_command_with_output(
         "create_badges_custom",
         products=products,
@@ -127,7 +127,7 @@ def remove_badges(badge_type: str) -> str:
 
 
 def add_release(
-    name: str, products: list[int], badge_text: str, badge_type: str, days: int
+    name: str, products: str, badge_text: str, badge_type: str, days: int
 ) -> str:
     return _call_command_with_output(
         "add_release",
@@ -139,7 +139,7 @@ def add_release(
     )
 
 
-def create_release(name: str, products: list[int]) -> str:
+def create_release(name: str, products: str) -> str:
     return _call_command_with_output(
         "create_release",
         name=name,

@@ -4,6 +4,7 @@ import time
 from argparse import ArgumentParser
 
 from django.core.management.base import BaseCommand
+from django.db import DatabaseError
 from fuzzywuzzy import fuzz, process
 
 from beers.models import Beer
@@ -70,7 +71,7 @@ class Command(BaseCommand):
                 self._mark_as_failed(beer)
                 return False, result.name if result else None
 
-        except Exception:
+        except (DatabaseError, ValueError):
             self._mark_as_failed(beer)
             return False, None
 

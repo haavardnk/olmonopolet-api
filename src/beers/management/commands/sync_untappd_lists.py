@@ -76,6 +76,11 @@ class Command(BaseCommand):
             except UntappdListNotFound:
                 self.stdout.write(self.style.ERROR("  Not found, marked inactive"))
             except Exception as e:
+                logger.exception(
+                    "Failed syncing list %s/%s",
+                    untappd_list.untappd_username,
+                    untappd_list.untappd_list_id,
+                )
                 self.stdout.write(self.style.ERROR(f"  Failed: {e}"))
                 failed += 1
 

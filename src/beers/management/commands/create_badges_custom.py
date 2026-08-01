@@ -38,7 +38,10 @@ class Command(BaseCommand):
             if beer is None:
                 continue
 
-            if self._create_badge_if_not_exists(beer, badge_text, badge_type):
+            _badge, created = Badge.objects.get_or_create(
+                beer=beer, text=badge_text, defaults={"type": badge_type}
+            )
+            if created:
                 created_count += 1
 
         return created_count
@@ -48,12 +51,3 @@ class Command(BaseCommand):
             return Beer.objects.get(vmp_id=int(product_id))
         except (Beer.DoesNotExist, ValueError):
             return None
-
-    def _create_badge_if_not_exists(
-        self, beer: Beer, badge_text: str, badge_type: str
-    ) -> bool:
-        if Badge.objects.filter(beer=beer, text=badge_text).exists():
-            return False
-
-        Badge.objects.create(beer=beer, text=badge_text, type=badge_type)
-        return True

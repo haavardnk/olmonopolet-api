@@ -37,24 +37,20 @@ class Command(BaseCommand):
         return unique_styles
 
     def _create_badges_for_styles(self, styles: list[str]) -> int:
-        created_count = 0
+        badges = []
 
         for style in styles:
             beers = Beer.objects.filter(style__startswith=style, active=True).order_by(
                 "-rating"
             )
-
             badge_count = self._calculate_badge_count(beers.count())
+            badges.extend(
+                Badge(beer=beer, text=f"#{index + 1} {style}", type="Top Style")
+                for index, beer in enumerate(beers[:badge_count])
+            )
 
-            for index, beer in enumerate(beers[:badge_count]):
-                Badge.objects.create(
-                    beer=beer,
-                    text=f"#{index + 1} {style}",
-                    type="Top Style",
-                )
-                created_count += 1
-
-        return created_count
+        Badge.objects.bulk_create(badges)
+        return len(badges)
 
     def _calculate_badge_count(self, beer_count: int) -> int:
         thresholds = [(300, 25), (100, 15), (50, 10), (25, 5), (10, 3)]
