@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from beers.api.utils import get_or_create_country
-from beers.models import Beer
-from beers.vmp import VmpApiError, VmpClient
-from beers.vmp.models import VmpProduct
 from django.core.management.base import BaseCommand, CommandError
 from django.utils import timezone
+
+from beers.api.utils import get_or_create_country
+from beers.models import Beer
+from clients.vmp import VmpApiError, VmpClient
+from clients.vmp.models import VmpProduct
 
 CATEGORIES: list[tuple[str, str | None]] = [
     ("øl", None),
@@ -21,9 +22,7 @@ ALL_STORES_DELIVERY = "Kan bestilles til alle butikker"
 
 
 class VmpCommand(BaseCommand):
-    def get_client(
-        self, request_delay: tuple[float, float] | None = None
-    ) -> VmpClient:
+    def get_client(self, request_delay: tuple[float, float] | None = None) -> VmpClient:
         try:
             return VmpClient.from_external_api(request_delay)
         except VmpApiError as exc:

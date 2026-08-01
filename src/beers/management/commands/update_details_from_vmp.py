@@ -3,9 +3,9 @@ from __future__ import annotations
 from argparse import ArgumentParser
 
 from beers.models import Beer
-from beers.vmp import VmpApiError
-from beers.vmp.commands import VmpCommand
-from beers.vmp.models import VmpProductDetail
+from beers.vmp_commands import VmpCommand
+from clients.vmp import VmpApiError
+from clients.vmp.models import VmpProductDetail
 from django.core.management.base import CommandError
 from django.utils import timezone
 

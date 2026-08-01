@@ -1,7 +1,7 @@
 import time
 
 import pytest
-from beers.vmp import circuit_breaker
+from clients.vmp import circuit_breaker
 from django.core.cache import cache
 
 

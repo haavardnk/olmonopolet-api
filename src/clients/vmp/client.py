@@ -11,8 +11,8 @@ from curl_cffi.requests.exceptions import RequestException
 from django.conf import settings
 
 from beers.models import ExternalAPI
-from beers.vmp import circuit_breaker
-from beers.vmp.models import (
+from clients.vmp import circuit_breaker
+from clients.vmp.models import (
     FacetValue,
     SearchResponse,
     VmpProduct,

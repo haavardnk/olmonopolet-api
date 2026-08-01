@@ -1,4 +1,4 @@
-from beers.vmp.models import (
+from clients.vmp.models import (
     SearchResponse,
     VmpProduct,
     VmpProductDetail,

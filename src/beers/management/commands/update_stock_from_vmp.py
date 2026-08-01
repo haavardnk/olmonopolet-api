@@ -5,9 +5,9 @@ import time
 from argparse import ArgumentParser
 
 from beers.models import Beer, Stock, Store
-from beers.vmp import VmpApiError, VmpBlockedError, VmpClient, circuit_breaker
-from beers.vmp.commands import CATEGORIES, VmpCommand
-from beers.vmp.models import VmpProduct
+from beers.vmp_commands import CATEGORIES, VmpCommand
+from clients.vmp import VmpApiError, VmpBlockedError, VmpClient, circuit_breaker
+from clients.vmp.models import VmpProduct
 from django.conf import settings
 from django.core.management.base import CommandError
 from django.db import transaction

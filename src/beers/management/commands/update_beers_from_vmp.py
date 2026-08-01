@@ -3,15 +3,15 @@ from __future__ import annotations
 from argparse import ArgumentParser
 
 from beers.models import Beer, VmpCrawlState
-from beers.vmp import VmpBlockedError, circuit_breaker
-from beers.vmp.commands import (
+from beers.vmp_commands import (
     CATEGORIES,
     VmpCommand,
     apply_product_fields,
     post_delivery,
     store_delivery,
 )
-from beers.vmp.models import VmpProduct
+from clients.vmp import VmpBlockedError, circuit_breaker
+from clients.vmp.models import VmpProduct
 from django.core.management.base import CommandError
 from django.db import transaction
 from django.utils import timezone

@@ -4,7 +4,7 @@ import pytest
 import responses
 from beers.models import Beer, ExternalAPI, Stock, Store
 from beers.tasks import update_stock_from_vmp
-from beers.vmp import circuit_breaker
+from clients.vmp import circuit_breaker
 from django.core.management.base import CommandError
 
 

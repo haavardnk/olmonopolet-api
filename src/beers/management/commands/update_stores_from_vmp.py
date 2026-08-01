@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from beers.models import Store
-from beers.vmp import VmpClient
-from beers.vmp.commands import VmpCommand
-from beers.vmp.models import VmpStore
+from beers.vmp_commands import VmpCommand
+from clients.vmp import VmpClient
+from clients.vmp.models import VmpStore
 
 
 class Command(VmpCommand):

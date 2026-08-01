@@ -46,7 +46,7 @@ from beers.models import (
 )
 from beers.patreon import fetch_patreon_posts
 from beers.untappd_lists import fetch_user_lists
-from beers.vmp import VmpApiError, VmpBlockedError, VmpClient
+from clients.vmp import VmpApiError, VmpBlockedError, VmpClient
 from django.contrib.postgres.aggregates import ArrayAgg
 from django.core.cache import cache
 from django.db import models

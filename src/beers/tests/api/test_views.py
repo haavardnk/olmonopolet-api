@@ -19,7 +19,7 @@ from beers.tests.factories import (
     StoreFactory,
     UserFactory,
 )
-from beers.vmp import VmpApiError, VmpBlockedError
+from clients.vmp import VmpApiError, VmpBlockedError
 from django.core.cache import cache
 from django.utils import timezone
 from rest_framework.authtoken.models import Token
