@@ -5,6 +5,7 @@ from pathlib import Path
 
 import firebase_admin
 import sentry_sdk
+from corsheaders.defaults import default_headers
 from firebase_admin import credentials
 from sentry_sdk.integrations.django import DjangoIntegration
 
@@ -139,6 +140,7 @@ CORS_ALLOW_METHODS = [
     "PATCH",
     "DELETE",
 ]
+CORS_ALLOW_HEADERS = (*default_headers, "x-api-key")
 CSRF_TRUSTED_ORIGINS = [
     "https://api.olmonopolet.app",
 ]

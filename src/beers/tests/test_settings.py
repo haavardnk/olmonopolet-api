@@ -3,6 +3,9 @@ from __future__ import annotations
 import importlib
 
 import pytest
+from corsheaders.middleware import CorsMiddleware
+from django.http import HttpResponse
+from django.test import RequestFactory
 
 import config.settings as project_settings
 
@@ -49,3 +52,19 @@ def test_redis_env_uses_redis_cache_and_broker(
         assert "orm" not in settings_module.Q_CLUSTER
 
     importlib.reload(project_settings)
+
+
+def test_preflight_allows_api_key_header() -> None:
+    middleware = CorsMiddleware(lambda request: HttpResponse())
+    request = RequestFactory().options(
+        "/beers/1/",
+        HTTP_ORIGIN="https://www.vinmonopolet.no",
+        HTTP_ACCESS_CONTROL_REQUEST_METHOD="GET",
+        HTTP_ACCESS_CONTROL_REQUEST_HEADERS="authorization,x-api-key",
+    )
+
+    response = middleware(request)
+
+    allowed = response.headers["access-control-allow-headers"].lower()
+    assert "x-api-key" in allowed
+    assert "authorization" in allowed
