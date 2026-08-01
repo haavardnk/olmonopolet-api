@@ -5,7 +5,6 @@ from datetime import date
 
 import feedparser
 import requests as http_requests
-from django.contrib.auth.models import User
 from django.db import models
 from django_q.models import OrmQ, Task
 from drf_dynamic_fields import DynamicFieldsMixin
@@ -190,15 +189,6 @@ class BadgeSerializer(serializers.ModelSerializer):
     class Meta:
         model = Badge
         fields = ["text"]
-
-
-class AppRatingSerializer(serializers.ModelSerializer):
-    rating = serializers.FloatField()
-    count = serializers.IntegerField()
-
-    class Meta:
-        model = User
-        fields = ["rating", "count"]
 
 
 class StoreSerializer(DynamicFieldsMixin, serializers.ModelSerializer):

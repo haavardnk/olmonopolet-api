@@ -97,11 +97,6 @@ def smart_update_untappd(**kwargs) -> str:
     return _call_command_with_output(command, calls)
 
 
-def get_users_friendlist(user: str | None = None, full: bool = False) -> str:
-    args = (user,) if user is not None else ()
-    return _call_command_with_output("get_users_friendlist", *args, full=full)
-
-
 def deactivate_inactive(days: int) -> str:
     return _call_command_with_output("deactivate_inactive", days)
 

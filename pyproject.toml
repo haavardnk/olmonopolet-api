@@ -6,9 +6,7 @@ readme = "README.md"
 requires-python = ">=3.12,<3.14"
 dependencies = [
     "beautifulsoup4>=4.14.3",
-    "blessed>=1.46.0",
     "cloudscraper25>=2.7.0",
-    "cryptography>=43.0.3",
     "curl-cffi>=0.15.0",
     "django-admin-shell>=2.0.1",
     "django-cors-headers>=4.5.0",
@@ -23,27 +21,19 @@ dependencies = [
     "drf-dynamic-fields>=0.4.0",
     "factory-boy>=3.3.3",
     "feedparser>=6.0.0",
-    "filters>=1.3.2",
     "firebase-admin>=6.5.0",
-    "freezegun>=1.5.1",
     "fuzzywuzzy>=0.18.0",
-    "googlesearch-python>=1.2.5",
     "gunicorn>=23.0.0",
     "jupyter>=1.1.1",
-    "lxml>=5.3.0",
-    "pandas>=2.2.3",
     "psycopg-binary>=3.3.0",
     "psycopg>=3.3.0",
     "pydantic>=2.9.0",
-    "pyjwt>=2.9.0",
     "pytest-django>=4.9.0",
     "pytest>=9.0.1",
     "redis>=5.0",
     "responses>=0.25.3",
     "ruff>=0.16.0",
     "sentry-sdk>=2.46.0",
-    "urllib3>=2.2.3",
-    "xmltodict>=0.14.2",
 ]
 
 [tool.ruff]
