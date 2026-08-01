@@ -1,7 +1,7 @@
 import pytest
 import responses
 from beers.models import Option
-from beers.patreon import (
+from clients.patreon import (
     POSTS_URL,
     TOKEN_URL,
     fetch_patreon_posts,

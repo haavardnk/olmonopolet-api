@@ -44,7 +44,7 @@ from beers.models import (
     UserListItem,
     WrongMatch,
 )
-from beers.patreon import fetch_patreon_posts
+from clients.patreon import fetch_patreon_posts
 from beers.untappd_lists import fetch_user_lists
 from clients.vmp import VmpApiError, VmpBlockedError, VmpClient
 from django.contrib.postgres.aggregates import ArrayAgg
