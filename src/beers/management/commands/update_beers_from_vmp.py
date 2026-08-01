@@ -7,13 +7,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from beers.models import Beer, VmpCrawlState
-from beers.vmp_commands import (
-    CATEGORIES,
-    VmpCommand,
-    apply_product_fields,
-    post_delivery,
-    store_delivery,
-)
+from beers.vmp_commands import CATEGORIES, VmpCommand, apply_product_fields
 from clients.vmp import VmpBlockedError, circuit_breaker
 from clients.vmp.models import VmpProduct
 
@@ -173,7 +167,7 @@ class Command(VmpCommand):
         if product.price is None:
             return False
         apply_product_fields(beer, product)
-        beer.post_delivery = post_delivery(product)
-        beer.store_delivery = store_delivery(product)
+        beer.post_delivery = product.post_delivery
+        beer.store_delivery = product.store_delivery
         beer.save()
         return True

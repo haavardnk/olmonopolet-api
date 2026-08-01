@@ -7,7 +7,7 @@ from django.core.management.base import CommandError
 from django.utils import timezone
 
 from beers.models import Beer, Country, ExternalAPI, VmpCrawlState
-from beers.vmp_commands import apply_product_fields, post_delivery, store_delivery
+from beers.vmp_commands import apply_product_fields
 from clients.vmp import circuit_breaker
 from clients.vmp.models import VmpProduct
 
@@ -101,13 +101,13 @@ class TestApplyProductFields:
 class TestDelivery:
     def test_post_and_store_delivery_true(self):
         product = beer_product()
-        assert post_delivery(product) is True
-        assert store_delivery(product) is True
+        assert product.post_delivery is True
+        assert product.store_delivery is True
 
     def test_delivery_false_without_availability(self):
         product = beer_product(productAvailability=None)
-        assert post_delivery(product) is False
-        assert store_delivery(product) is False
+        assert product.post_delivery is False
+        assert product.store_delivery is False
 
 
 class TestFullFlow:

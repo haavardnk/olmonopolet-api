@@ -4,6 +4,9 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+VMP_WEB_URL = "https://www.vinmonopolet.no"
+ALL_STORES_DELIVERY = "Kan bestilles til alle butikker"
+
 
 class _Base(BaseModel):
     model_config = ConfigDict(
@@ -70,6 +73,26 @@ class VmpProduct(_Base):
         if isinstance(value, dict) and not value.get("name"):
             return None
         return value
+
+    @property
+    def web_url(self) -> str:
+        return f"{VMP_WEB_URL}{self.url}"
+
+    @property
+    def post_delivery(self) -> bool:
+        if self.product_availability is None:
+            return False
+        delivery = self.product_availability.delivery_availability
+        return bool(delivery and delivery.available_for_purchase)
+
+    @property
+    def store_delivery(self) -> bool:
+        if self.product_availability is None:
+            return False
+        stores = self.product_availability.stores_availability
+        if stores is None:
+            return False
+        return any(info.readable_value == ALL_STORES_DELIVERY for info in stores.infos)
 
 
 class Characteristic(_Base):
