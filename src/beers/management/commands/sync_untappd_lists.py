@@ -1,13 +1,44 @@
 from __future__ import annotations
 
 import json
+import logging
 from argparse import ArgumentParser
 
 from django.core.management.base import BaseCommand, CommandError
+from django.utils import timezone
 
-from beers.models import UntappdList
-from beers.untappd_lists import sync_untappd_list
-from clients.untappd import UntappdClient
+from beers.models import UntappdList, UserList
+from clients.untappd import UntappdClient, UntappdListNotFound
+
+logger = logging.getLogger(__name__)
+
+
+def sync_untappd_list(
+    untappd_list: UntappdList, client: UntappdClient | None = None
+) -> int:
+    client = client or UntappdClient.from_options()
+
+    try:
+        beer_ids = client.fetch_list_beer_ids(
+            untappd_list.untappd_username,
+            untappd_list.untappd_list_id,
+        )
+    except UntappdListNotFound:
+        logger.info(
+            "List %s/%s no longer accessible, deactivating",
+            untappd_list.untappd_username,
+            untappd_list.untappd_list_id,
+        )
+        untappd_list.active = False
+        untappd_list.save(update_fields=["active"])
+        UserList.objects.filter(untappd_list=untappd_list).delete()
+        raise
+
+    untappd_list.untappd_beer_ids = beer_ids
+    untappd_list.item_count = len(beer_ids)
+    untappd_list.last_synced = timezone.now()
+    untappd_list.save(update_fields=["untappd_beer_ids", "item_count", "last_synced"])
+    return len(beer_ids)
 
 
 class Command(BaseCommand):
@@ -42,14 +73,11 @@ class Command(BaseCommand):
                 count = sync_untappd_list(untappd_list, client)
                 total_synced += 1
                 self.stdout.write(f"  Found {count} beers")
+            except UntappdListNotFound:
+                self.stdout.write(self.style.ERROR("  Not found, marked inactive"))
             except Exception as e:
                 self.stdout.write(self.style.ERROR(f"  Failed: {e}"))
-                if "not found" in str(e) or "private" in str(e):
-                    untappd_list.active = False
-                    untappd_list.save(update_fields=["active"])
-                    self.stdout.write("  Marked inactive")
-                else:
-                    failed += 1
+                failed += 1
 
         summary = json.dumps({"synced": total_synced, "total": lists.count()})
         self.stdout.write(summary)

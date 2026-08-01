@@ -157,8 +157,8 @@ def sync_tasted() -> str:
 
 
 def sync_untappd_list_task(untappd_list_pk: int) -> int:
+    from beers.management.commands.sync_untappd_lists import sync_untappd_list
     from beers.models import UntappdList
-    from beers.untappd_lists import sync_untappd_list
 
     untappd_list = UntappdList.objects.get(pk=untappd_list_pk)
     return sync_untappd_list(untappd_list)
