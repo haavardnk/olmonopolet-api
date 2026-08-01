@@ -447,6 +447,21 @@ class UserList(models.Model):
     def is_untappd(self) -> bool:
         return self.untappd_list_id is not None
 
+    def _compute_list_type(self) -> str:
+        if self.is_untappd:
+            return self.ListType.UNTAPPD
+        if self.show_store:
+            return self.ListType.SHOPPING
+        if self.show_vintage:
+            return self.ListType.CELLAR
+        if self.event_date:
+            return self.ListType.EVENT
+        return self.ListType.STANDARD
+
+    def save(self, *args, **kwargs):
+        self.list_type = self._compute_list_type()
+        super().save(*args, **kwargs)
+
     def __str__(self):
         return f"{self.user.username} - {self.name}"
 

@@ -501,7 +501,7 @@ class UserListViewSet(BrowsableMixin, ModelViewSet):
     @action(detail=True, methods=["post"], url_path="items")
     def add_item(self, request, pk=None):
         user_list = self.get_object()
-        if user_list.untappd_list_id is not None:
+        if user_list.is_untappd:
             return Response(
                 {"detail": "Cannot modify items on an Untappd list"}, status=403
             )
@@ -523,7 +523,7 @@ class UserListViewSet(BrowsableMixin, ModelViewSet):
     )
     def item_detail(self, request, pk=None, item_pk: str | None = None):
         user_list = self.get_object()
-        if user_list.untappd_list_id is not None:
+        if user_list.is_untappd:
             return Response(
                 {"detail": "Cannot modify items on an Untappd list"}, status=403
             )
@@ -545,7 +545,7 @@ class UserListViewSet(BrowsableMixin, ModelViewSet):
     )
     def product_detail(self, request, pk=None, product_id=None):
         user_list = self.get_object()
-        if user_list.untappd_list_id is not None:
+        if user_list.is_untappd:
             return Response(
                 {"detail": "Cannot modify items on an Untappd list"}, status=403
             )
@@ -569,7 +569,7 @@ class UserListViewSet(BrowsableMixin, ModelViewSet):
     @action(detail=True, methods=["post", "patch"], url_path="items/reorder")
     def reorder_items(self, request, pk=None):
         user_list = self.get_object()
-        if user_list.untappd_list_id is not None:
+        if user_list.is_untappd:
             return Response(
                 {"detail": "Cannot modify items on an Untappd list"}, status=403
             )
@@ -642,7 +642,6 @@ class UntappdListViewSet(BrowsableMixin, ModelViewSet):
         user_list = UserList.objects.create(
             user=request.user,
             name=data["name"],
-            list_type=UserList.ListType.UNTAPPD,
             untappd_list=untappd_list,
             sort_order=max_sort + 1,
         )

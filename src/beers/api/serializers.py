@@ -443,7 +443,7 @@ class UserListMethodsMixin:
         )
 
     def get_is_read_only(self, obj: UserList) -> bool:
-        return obj.untappd_list_id is not None
+        return obj.is_untappd
 
 
 class UserListSerializer(UserListMethodsMixin, serializers.ModelSerializer):
@@ -549,22 +549,20 @@ class UserListSerializer(UserListMethodsMixin, serializers.ModelSerializer):
         return data
 
 
+FLAG_KEYS = frozenset(
+    {"show_quantity", "show_store", "show_vintage", "show_prices", "show_notes"}
+)
+
 FLAG_DEFAULTS: dict[str, dict[str, bool]] = {
     "shopping": {"show_quantity": True, "show_store": True},
     "cellar": {"show_quantity": True, "show_vintage": True},
 }
 
 
-def compute_list_type(obj: UserList) -> str:
-    if obj.untappd_list_id is not None:
-        return "untappd"
-    if obj.show_store:
-        return "shopping"
-    if obj.show_vintage:
-        return "cellar"
-    if obj.event_date:
-        return "event"
-    return "standard"
+def apply_flag_defaults(validated_data: dict, list_type: str | None) -> None:
+    if not list_type or any(key in validated_data for key in FLAG_KEYS):
+        return
+    validated_data.update(FLAG_DEFAULTS.get(list_type, {}))
 
 
 class UserListCreateSerializer(serializers.ModelSerializer):
@@ -595,22 +593,8 @@ class UserListCreateSerializer(serializers.ModelSerializer):
         ]
 
     def create(self, validated_data: dict) -> UserList:
-        list_type = validated_data.pop("list_type", "standard")
-        flag_keys = {
-            "show_quantity",
-            "show_store",
-            "show_vintage",
-            "show_prices",
-            "show_notes",
-        }
-        has_flags = any(k in validated_data for k in flag_keys)
-        if not has_flags:
-            for key, val in FLAG_DEFAULTS.get(list_type, {}).items():
-                validated_data.setdefault(key, val)
-        instance = super().create(validated_data)
-        instance.list_type = compute_list_type(instance)
-        instance.save(update_fields=["list_type"])
-        return instance
+        apply_flag_defaults(validated_data, validated_data.pop("list_type", None))
+        return super().create(validated_data)
 
 
 class UserListUpdateSerializer(serializers.ModelSerializer):
@@ -630,22 +614,8 @@ class UserListUpdateSerializer(serializers.ModelSerializer):
         ]
 
     def update(self, instance: UserList, validated_data: dict) -> UserList:
-        list_type = validated_data.pop("list_type", None)
-        flag_keys = {
-            "show_quantity",
-            "show_store",
-            "show_vintage",
-            "show_prices",
-            "show_notes",
-        }
-        has_flags = any(k in validated_data for k in flag_keys)
-        if list_type and not has_flags:
-            for key, val in FLAG_DEFAULTS.get(list_type, {}).items():
-                validated_data[key] = val
-        instance = super().update(instance, validated_data)
-        instance.list_type = compute_list_type(instance)
-        instance.save(update_fields=["list_type"])
-        return instance
+        apply_flag_defaults(validated_data, validated_data.pop("list_type", None))
+        return super().update(instance, validated_data)
 
 
 class SharedUserListSerializer(UserListMethodsMixin, serializers.ModelSerializer):
