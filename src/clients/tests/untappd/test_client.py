@@ -78,6 +78,17 @@ class TestGenerateQueryVariations:
 
 class TestSearchBeers:
     @responses.activate
+    def test_sends_browser_user_agent(self, client: UntappdClient) -> None:
+        responses.add(
+            responses.GET,
+            f"{UNTAPPD_BASE}/b/lervig-hazy-ipa/555",
+            body="<html></html>",
+            status=200,
+        )
+        client.get_beer(f"{UNTAPPD_BASE}/b/lervig-hazy-ipa/555")
+        assert responses.calls[0].request.headers["User-Agent"] == "Mozilla/5.0"
+
+    @responses.activate
     def test_parses_results(self, client: UntappdClient) -> None:
         responses.add(
             responses.GET,

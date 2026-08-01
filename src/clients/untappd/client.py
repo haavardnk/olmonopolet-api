@@ -25,6 +25,7 @@ COOKIE_NAME = "untappd_user_v3_e"
 REQUEST_DELAY = 2
 _TIMEOUT = 30
 _MAX_PAGES = 100
+_USER_AGENT = "Mozilla/5.0"
 _AJAX_HEADERS = {
     "X-Requested-With": "XMLHttpRequest",
     "Accept": "text/html, */*; q=0.01",
@@ -75,6 +76,7 @@ class UntappdClient:
         self._scraper = scraper or cloudscraper25.create_scraper(
             browser="chrome", enable_stealth=True
         )
+        self._scraper.headers["User-Agent"] = _USER_AGENT
         self._cookie_injected = False
 
     @classmethod
