@@ -13,11 +13,11 @@ dependencies = [
     "django-dirtyfields>=1.9.8",
     "django-extensions>=3.3.0",
     "django-filter>=25.2",
-    "django-hosts>=6.0",
-    "django-q2>=1.7.3",
-    "django>=5.2,<5.3",
+    "django-hosts>=7.0",
+    "django-q2>=1.10.0",
+    "django>=6.0,<6.1",
     "djangorestframework-api-key>=3.1.0",
-    "djangorestframework>=3.15.2",
+    "djangorestframework>=3.17.1",
     "drf-dynamic-fields>=0.4.0",
     "factory-boy>=3.3.3",
     "feedparser>=6.0.0",
@@ -46,7 +46,7 @@ extend-select = ["I"]
 search_path = ["src"]
 
 [[tool.pyrefly.sub-config]]
-matches = "src/beers/api/serializers.py"
+matches = "src/beers/api/serializers/**"
 [tool.pyrefly.sub-config.errors]
 bad-override = false
 
