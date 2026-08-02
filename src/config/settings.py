@@ -33,9 +33,12 @@ REDIS_CACHE_URL = os.getenv("REDIS_CACHE_URL", REDIS_URL)
 REDIS_Q_URL = os.getenv("REDIS_Q_URL", REDIS_URL)
 
 firebase_creds_json = os.getenv("FIREBASE_CREDENTIALS_JSON")
-if firebase_creds_json and not firebase_admin._apps:
-    cred = credentials.Certificate(json.loads(firebase_creds_json))
-    firebase_admin.initialize_app(cred)
+if firebase_creds_json:
+    try:
+        firebase_admin.get_app()
+    except ValueError:
+        cred = credentials.Certificate(json.loads(firebase_creds_json))
+        firebase_admin.initialize_app(cred)
 
 
 ALLOWED_HOSTS = os.getenv(
