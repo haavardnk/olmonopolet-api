@@ -493,10 +493,18 @@ class TestUntappdRssFeedMe:
 
     def test_put_creates_feed(self, auth_client: tuple) -> None:
         client, user = auth_client
-        response = client.put(
-            "/rss/me/",
-            {"feed_url": "https://untappd.com/rss/user/newuser?key=xyz789"},
-        )
+        with (
+            patch("beers.api.serializers.misc.http_requests.get") as mock_get,
+            patch("beers.api.serializers.misc.feedparser.parse") as mock_parse,
+        ):
+            mock_get.return_value.status_code = 200
+            mock_get.return_value.text = ""
+            mock_parse.return_value.bozo = False
+            mock_parse.return_value.entries = []
+            response = client.put(
+                "/rss/me/",
+                {"feed_url": "https://untappd.com/rss/user/newuser?key=xyz789"},
+            )
         assert response.status_code == 201
         assert UntappdRssFeed.objects.filter(user=user).exists()
 
