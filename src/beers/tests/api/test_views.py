@@ -136,6 +136,25 @@ class TestStockChangeViewSet:
         matched = [r for r in results if r["beer"]["vmp_id"] == beer.vmp_id]
         assert matched[0]["beer"]["user_tasted"] is expected
 
+    def test_query_count_does_not_scale_with_results(self, auth_client: tuple) -> None:
+        client, _user = auth_client
+        store = StoreFactory()
+
+        def query_count(beer_count: int) -> int:
+            Stock.objects.all().delete()
+            for _ in range(beer_count):
+                StockFactory(
+                    store=store,
+                    beer=BeerFactory(country=CountryFactory()),
+                    quantity=5,
+                    stocked_at=timezone.now(),
+                )
+            with CaptureQueriesContext(connection) as ctx:
+                client.get(f"/stockchange/?store={store.pk}")
+            return len(ctx)
+
+        assert query_count(1) == query_count(5)
+
 
 @pytest.mark.django_db
 class TestCountryViewSet:

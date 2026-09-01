@@ -5,7 +5,6 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, permissions
 from rest_framework.viewsets import ModelViewSet
 
-from beers.api.views.base import BrowsableMixin
 from beers.api.filters import StockChangeFilter
 from beers.api.pagination import LargeResultPagination, Pagination
 from beers.api.serializers import (
@@ -13,6 +12,7 @@ from beers.api.serializers import (
     StockSerializer,
     StoreSerializer,
 )
+from beers.api.views.base import BrowsableMixin
 from beers.models import Beer, Stock, Store
 
 
@@ -24,7 +24,11 @@ class StockChangeViewSet(BrowsableMixin, ModelViewSet):
     filterset_class = StockChangeFilter
 
     def get_queryset(self) -> QuerySet[Stock]:
-        beer_qs = Beer.objects.with_user_tasted(self.request.user)
+        beer_qs = (
+            Beer.objects.with_user_tasted(self.request.user)
+            .select_related("country")
+            .prefetch_related("stock_set")
+        )
 
         return (
             Stock.objects.stock_changes()
