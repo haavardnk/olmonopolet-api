@@ -94,12 +94,13 @@ class TestProduct:
         data = {
             k: v
             for k, v in PRODUCT_JSON.items()
-            if k not in ("price", "main_sub_category")
+            if k not in ("price", "main_sub_category", "product_selection")
         }
         product = VmpProduct.model_validate(data)
 
         assert product.price is None
         assert product.main_sub_category is None
+        assert product.product_selection == "Tilleggsutvalget"
 
 
 class TestProductDetail:

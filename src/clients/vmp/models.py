@@ -6,6 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 VMP_WEB_URL = "https://www.vinmonopolet.no"
 ALL_STORES_DELIVERY = "Kan bestilles til alle butikker"
+DEFAULT_PRODUCT_SELECTION = "Tilleggsutvalget"
 
 
 class _Base(BaseModel):
@@ -59,7 +60,7 @@ class VmpProduct(_Base):
     volume: ValueField
     main_category: Named
     main_country: Named
-    product_selection: str
+    product_selection: str = DEFAULT_PRODUCT_SELECTION
     main_sub_category: Named | None = None
     price: ValueField | None = None
     product_availability: ProductAvailability | None = Field(

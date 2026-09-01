@@ -91,6 +91,15 @@ class TestApplyProductFields:
         assert beer.price is None
         assert beer.price_per_volume is None
 
+    def test_without_product_selection_uses_default(self, db):
+        data = {k: v for k, v in BEER_DATA.items() if k != "product_selection"}
+        beer = Beer(vmp_id=9999)
+        apply_product_fields(beer, VmpProduct.model_validate(data))
+        beer.save()
+        beer.refresh_from_db()
+
+        assert beer.product_selection == "Tilleggsutvalget"
+
     def test_reactivates_inactive_beer(self, db):
         beer = Beer(vmp_id=9999, active=False)
         apply_product_fields(beer, beer_product())
