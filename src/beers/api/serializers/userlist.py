@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from datetime import date
 
+from django.utils import timezone
 from django_q.models import OrmQ, Task
 from rest_framework import serializers
 
@@ -102,6 +102,8 @@ def prime_user_list_context(context: dict, user_lists: Sequence[UserList]) -> No
 
 
 class UserListMethodsMixin:
+    context: dict
+
     def _untappd_product_ids(self, obj: UserList) -> list[str] | None:
         if not obj.untappd_list:
             return None
@@ -143,7 +145,7 @@ class UserListMethodsMixin:
     def get_is_past(self, obj: UserList) -> bool | None:
         if not obj.event_date:
             return None
-        return obj.event_date < date.today()
+        return obj.event_date < timezone.localdate()
 
     def get_stats(self, obj: UserList) -> dict | None:
         if not obj.show_vintage:

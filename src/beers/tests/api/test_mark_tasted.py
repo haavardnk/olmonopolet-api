@@ -1,4 +1,5 @@
 import pytest
+from django.contrib.auth.models import User
 from rest_framework.test import APIClient
 
 from beers.models import Tasted
@@ -6,7 +7,7 @@ from beers.tests.factories import BeerFactory, UserFactory
 
 
 @pytest.fixture
-def auth_client() -> tuple[APIClient, any]:
+def auth_client() -> tuple[APIClient, User]:
     user = UserFactory()
     client = APIClient()
     client.force_authenticate(user=user)

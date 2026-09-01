@@ -8,11 +8,11 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
-from beers.api.views.base import BrowsableMixin
 from beers.api.filters import BeerFilter, NullsAlwaysLastOrderingFilter
 from beers.api.pagination import LargeResultPagination
 from beers.api.serializers import BeerSerializer
 from beers.api.utils import bulk_import_tasted, parse_untappd_file
+from beers.api.views.base import BrowsableMixin
 from beers.models import Beer, Stock, Tasted
 from clients.vmp import VmpApiError, VmpBlockedError, VmpClient
 
@@ -55,12 +55,12 @@ class BeerViewSet(BrowsableMixin, ModelViewSet):
 
     def get_queryset(self) -> QuerySet[Beer]:
         queryset = (
-            Beer.objects.select_related("country", "brewery")
+            Beer.objects.with_user_tasted(self.request.user)
+            .select_related("country", "brewery")
             .prefetch_related(
                 "badge_set",
                 Prefetch("stock_set", queryset=Stock.objects.select_related("store")),
             )
-            .with_user_tasted(self.request.user)
         )
 
         beers = getattr(self.request, "query_params", {}).get("beers")

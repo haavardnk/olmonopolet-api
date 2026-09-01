@@ -2,6 +2,7 @@ import io
 from unittest.mock import patch
 
 import pytest
+from django.contrib.auth.models import User
 from django.core.cache import cache
 from django.db import connection
 from django.test.utils import CaptureQueriesContext
@@ -35,7 +36,7 @@ def clear_cache() -> None:
 
 
 @pytest.fixture
-def auth_client() -> tuple[APIClient, any]:
+def auth_client() -> tuple[APIClient, User]:
     user = UserFactory()
     client = APIClient()
     client.force_authenticate(user=user)

@@ -1,6 +1,6 @@
 import io
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 
@@ -18,16 +18,16 @@ from beers.tests.factories import BeerFactory, UserFactory
 class TestParseCheckinTime:
     def test_int_timestamp(self) -> None:
         result = _parse_checkin_time(1700000000)
-        assert result == datetime(2023, 11, 14, 22, 13, 20, tzinfo=timezone.utc)
+        assert result == datetime(2023, 11, 14, 22, 13, 20, tzinfo=UTC)
 
     def test_float_timestamp(self) -> None:
         result = _parse_checkin_time(1700000000.5)
         assert result is not None
-        assert result.tzinfo == timezone.utc
+        assert result.tzinfo == UTC
 
     def test_datetime_string_no_tz(self) -> None:
         result = _parse_checkin_time("2024-01-15 10:30:00")
-        assert result == datetime(2024, 1, 15, 10, 30, 0, tzinfo=timezone.utc)
+        assert result == datetime(2024, 1, 15, 10, 30, 0, tzinfo=UTC)
 
     def test_datetime_string_with_tz(self) -> None:
         result = _parse_checkin_time("Mon, 15 Jan 2024 10:30:00 +0000")
@@ -138,7 +138,7 @@ class TestBulkImportTasted:
         user = UserFactory()
         beer = BeerFactory(untpd_id=500)
         checkins: list[CheckinTuple] = [
-            (1001, 500, 4.5, datetime(2024, 1, 1, tzinfo=timezone.utc)),
+            (1001, 500, 4.5, datetime(2024, 1, 1, tzinfo=UTC)),
         ]
 
         result = bulk_import_tasted(user, checkins)
@@ -152,7 +152,7 @@ class TestBulkImportTasted:
         user = UserFactory()
         BeerFactory(untpd_id=500)
         checkins: list[CheckinTuple] = [
-            (1001, 500, 4.5, datetime(2024, 1, 1, tzinfo=timezone.utc)),
+            (1001, 500, 4.5, datetime(2024, 1, 1, tzinfo=UTC)),
         ]
         bulk_import_tasted(user, checkins)
         result = bulk_import_tasted(user, checkins)

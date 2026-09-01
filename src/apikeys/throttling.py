@@ -1,3 +1,5 @@
+from typing import cast
+
 from rest_framework.throttling import SimpleRateThrottle
 from rest_framework_api_key.permissions import KeyParser
 
@@ -15,7 +17,7 @@ class TieredAPIKeyThrottle(SimpleRateThrottle):
         if not raw_key:
             return True
         try:
-            api_key = ClientAPIKey.objects.get_from_key(raw_key)
+            api_key = cast(ClientAPIKey, ClientAPIKey.objects.get_from_key(raw_key))
         except ClientAPIKey.DoesNotExist:
             return True
 
@@ -24,13 +26,18 @@ class TieredAPIKeyThrottle(SimpleRateThrottle):
             return True
 
         self.rate = rate
-        self.num_requests, self.duration = self.parse_rate(rate)
+        num_requests, duration = self.parse_rate(rate)
+        if num_requests is None or duration is None:
+            return True
+
+        self.num_requests = num_requests
+        self.duration = duration
         self.key = f"throttle_apikey_{api_key.prefix}"
         self.history = self.cache.get(self.key, [])
         self.now = self.timer()
-        while self.history and self.history[-1] <= self.now - self.duration:
+        while self.history and self.history[-1] <= self.now - duration:
             self.history.pop()
-        if len(self.history) >= self.num_requests:
+        if len(self.history) >= num_requests:
             return self.throttle_failure()
         return self.throttle_success()
 

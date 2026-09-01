@@ -1,5 +1,6 @@
 import logging
 import uuid
+from typing import ClassVar
 
 import requests
 from dirtyfields import DirtyFieldsMixin
@@ -12,7 +13,7 @@ from django.db.models.functions import Greatest
 logger = logging.getLogger(__name__)
 
 
-class BeerQuerySet(models.QuerySet):
+class BeerQuerySet(models.QuerySet["Beer"]):
     def with_user_tasted(self, user) -> "BeerQuerySet":
         if user and user.is_authenticated:
             return self.annotate(
@@ -23,7 +24,15 @@ class BeerQuerySet(models.QuerySet):
         return self.annotate(user_tasted=Value(False))
 
 
-class StockQuerySet(models.QuerySet):
+class BeerManager(models.Manager["Beer"]):
+    def get_queryset(self) -> BeerQuerySet:
+        return BeerQuerySet(self.model, using=self._db)
+
+    def with_user_tasted(self, user) -> BeerQuerySet:
+        return self.get_queryset().with_user_tasted(user)
+
+
+class StockQuerySet(models.QuerySet["Stock"]):
     def stock_changes(self) -> "StockQuerySet":
         return (
             self.exclude(Q(stocked_at=None) & Q(unstocked_at=None))
@@ -34,6 +43,14 @@ class StockQuerySet(models.QuerySet):
                 F("pk").asc(),
             )
         )
+
+
+class StockManager(models.Manager["Stock"]):
+    def get_queryset(self) -> StockQuerySet:
+        return StockQuerySet(self.model, using=self._db)
+
+    def stock_changes(self) -> StockQuerySet:
+        return self.get_queryset().stock_changes()
 
 
 class Option(models.Model):
@@ -76,7 +93,11 @@ class Brewery(models.Model):
 
 
 class Beer(DirtyFieldsMixin, models.Model):
-    objects = BeerQuerySet.as_manager()
+    objects: ClassVar[BeerManager] = BeerManager()
+
+    badge_set: models.Manager["Badge"]
+    stock_set: models.Manager["Stock"]
+    user_tasted: bool
 
     # Vinmonopolet info
     vmp_id = models.BigIntegerField(primary_key=True)
@@ -269,7 +290,7 @@ class Stock(models.Model):
     beer = models.ForeignKey(Beer, on_delete=models.CASCADE, related_name="stock_set")
     quantity = models.IntegerField()
 
-    objects = StockQuerySet.as_manager()
+    objects: ClassVar[StockManager] = StockManager()
 
     stock_updated = models.DateTimeField(auto_now=True)
     last_seen_in_stock_sync = models.DateTimeField(blank=True, null=True)
@@ -361,6 +382,8 @@ class Badge(models.Model):
 
 
 class Release(models.Model):
+    _beer_count: int
+
     name = models.CharField(max_length=50, primary_key=True, unique=True)
     beer = models.ManyToManyField(Beer)
     active = models.BooleanField(default=True)
@@ -408,6 +431,8 @@ class UntappdList(models.Model):
 
 
 class UserList(models.Model):
+    items: models.Manager["UserListItem"]
+
     class ListType(models.TextChoices):
         STANDARD = "standard", "Standard"
         SHOPPING = "shopping", "Shopping"
@@ -498,6 +523,8 @@ class FollowedList(models.Model):
 
 
 class UntappdCheckin(models.Model):
+    user_id: int
+
     untpd_checkin_id = models.IntegerField(primary_key=True)
     user = models.ForeignKey(
         "auth.User", on_delete=CASCADE, related_name="untappd_checkins"

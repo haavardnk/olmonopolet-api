@@ -5,8 +5,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import GenericViewSet
 
-from beers.api.views.base import PUBLIC_CACHE_SECONDS, BrowsableMixin
 from beers.api.serializers import WrongMatchSerializer
+from beers.api.views.base import PUBLIC_CACHE_SECONDS, BrowsableMixin
 from beers.models import WrongMatch
 from clients.patreon import fetch_patreon_posts
 

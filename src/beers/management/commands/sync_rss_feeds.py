@@ -4,7 +4,7 @@ import json
 import re
 from argparse import ArgumentParser
 from calendar import timegm
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from django.core.management.base import BaseCommand, CommandError
 
@@ -68,7 +68,7 @@ class Command(BaseCommand):
         new_entries = self._filter_new_entries(entries)
         if not new_entries:
             self.stdout.write(f"No new entries for {feed_obj.user.username}")
-            feed_obj.last_synced = datetime.now(timezone.utc)
+            feed_obj.last_synced = datetime.now(UTC)
             feed_obj.save(update_fields=["last_synced"])
             return 0, True
 
@@ -97,7 +97,7 @@ class Command(BaseCommand):
             else:
                 self.stdout.write(self.style.WARNING(f"  No match: {title}"))
 
-        feed_obj.last_synced = datetime.now(timezone.utc)
+        feed_obj.last_synced = datetime.now(UTC)
         feed_obj.save(update_fields=["last_synced"])
 
         self.stdout.write(f"Imported {imported} checkins for {feed_obj.user.username}")
@@ -130,7 +130,7 @@ class Command(BaseCommand):
             return None
         try:
             ts = timegm(published_parsed)
-            return datetime.fromtimestamp(ts, tz=timezone.utc)
+            return datetime.fromtimestamp(ts, tz=UTC)
         except (ValueError, OverflowError):
             return None
 

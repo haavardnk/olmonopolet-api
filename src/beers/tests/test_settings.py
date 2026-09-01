@@ -64,6 +64,7 @@ def test_preflight_allows_api_key_header() -> None:
     )
 
     response = middleware(request)
+    assert isinstance(response, HttpResponse)
 
     allowed = response.headers["access-control-allow-headers"].lower()
     assert "x-api-key" in allowed

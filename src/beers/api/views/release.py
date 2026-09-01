@@ -9,9 +9,9 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.viewsets import ReadOnlyModelViewSet
 
-from beers.api.views.base import PUBLIC_CACHE_SECONDS, BrowsableMixin
 from beers.api.pagination import Pagination
 from beers.api.serializers import CountrySerializer, ReleaseSerializer
+from beers.api.views.base import PUBLIC_CACHE_SECONDS, BrowsableMixin
 from beers.models import Country, Release
 
 

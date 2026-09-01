@@ -1,9 +1,13 @@
+from typing import ClassVar
+
 from django.conf import settings
 from django.db import models
-from rest_framework_api_key.models import AbstractAPIKey
+from rest_framework_api_key.models import AbstractAPIKey, APIKeyManager
 
 
 class ClientAPIKey(AbstractAPIKey):
+    objects: ClassVar[APIKeyManager] = APIKeyManager()
+
     class Tier(models.TextChoices):
         INTERNAL = "internal", "Internal"
         OFFICIAL = "official", "Official"

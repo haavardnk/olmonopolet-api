@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from django.contrib import admin
+from django.contrib.admin import ActionLocation
+from django.contrib.admin.options import Action
 from django.contrib.auth.admin import UserAdmin
 from django.contrib.auth.models import User
 from django.db import models
@@ -270,8 +272,12 @@ class UserWithTastedAdmin(admin.ModelAdmin):
     inlines = [TastedInline]
     actions = ["delete_all_tasteds"]
 
-    def get_actions(self, request):
-        actions = super().get_actions(request)
+    def get_actions(
+        self,
+        request: HttpRequest,
+        action_location: ActionLocation = ActionLocation.CHANGE_LIST,
+    ) -> dict[str, Action | None]:
+        actions = super().get_actions(request, action_location=action_location)
         actions.pop("delete_selected", None)
         return actions
 
@@ -386,8 +392,12 @@ class UserWithListsAdmin(admin.ModelAdmin):
         count, _ = UserList.objects.filter(user__in=queryset).delete()
         self.message_user(request, f"Deleted {count} lists.")
 
-    def get_actions(self, request):
-        actions = super().get_actions(request)
+    def get_actions(
+        self,
+        request: HttpRequest,
+        action_location: ActionLocation = ActionLocation.CHANGE_LIST,
+    ) -> dict[str, Action | None]:
+        actions = super().get_actions(request, action_location=action_location)
         actions.pop("delete_selected", None)
         return actions
 
@@ -429,8 +439,12 @@ class UserWithCheckinsAdmin(admin.ModelAdmin):
     inlines = [UntappdCheckinInline]
     actions = ["delete_all_checkins"]
 
-    def get_actions(self, request):
-        actions = super().get_actions(request)
+    def get_actions(
+        self,
+        request: HttpRequest,
+        action_location: ActionLocation = ActionLocation.CHANGE_LIST,
+    ) -> dict[str, Action | None]:
+        actions = super().get_actions(request, action_location=action_location)
         actions.pop("delete_selected", None)
         return actions
 

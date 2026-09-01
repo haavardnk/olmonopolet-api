@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import csv
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from django.contrib.auth.models import User
 from django.db import transaction
@@ -42,20 +42,20 @@ def get_or_create_country(country_name: str | None) -> Country | None:
     return country
 
 
-def _parse_checkin_time(raw: str | int | float | None) -> datetime | None:
+def _parse_checkin_time(raw: str | float | None) -> datetime | None:
     if not raw:
         return None
 
     if isinstance(raw, (int, float)):
         try:
-            return datetime.fromtimestamp(raw, tz=timezone.utc)
+            return datetime.fromtimestamp(raw, tz=UTC)
         except (ValueError, OSError):
             return None
 
     for fmt in _DATETIME_FORMATS:
         try:
-            dt = datetime.strptime(str(raw).strip(), fmt)
-            return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+            dt = datetime.strptime(str(raw).strip(), fmt)  # noqa: DTZ007
+            return dt if dt.tzinfo else dt.replace(tzinfo=UTC)
         except ValueError:
             continue
 

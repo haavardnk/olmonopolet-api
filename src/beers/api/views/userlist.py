@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json as _json
+from collections.abc import Sequence
 
 from django.db import models
 from django.db.models import Case, Max, QuerySet, Value, When
@@ -10,7 +11,6 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
-from beers.api.views.base import BrowsableMixin
 from beers.api.serializers import (
     ItemReorderSerializer,
     ListReorderSerializer,
@@ -26,6 +26,7 @@ from beers.api.serializers import (
     UserListUpdateSerializer,
     prime_user_list_context,
 )
+from beers.api.views.base import BrowsableMixin
 from beers.models import (
     Beer,
     FollowedList,
@@ -78,7 +79,7 @@ class UserListViewSet(BrowsableMixin, ModelViewSet):
         followed = self._followed_lists(request.user)
 
         context = self.get_serializer_context()
-        prime_user_list_context(context, owned + followed)
+        prime_user_list_context(context, [*owned, *followed])
 
         owned_data = [
             dict(item)
@@ -98,7 +99,7 @@ class UserListViewSet(BrowsableMixin, ModelViewSet):
 
         return Response(owned_data + followed_data)
 
-    def _followed_lists(self, user) -> list[UserList]:
+    def _followed_lists(self, user) -> Sequence[UserList]:
         tokens = list(
             FollowedList.objects.filter(user=user).values_list("share_token", flat=True)
         )

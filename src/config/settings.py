@@ -11,7 +11,7 @@ from firebase_admin import credentials
 from sentry_sdk.integrations.django import DjangoIntegration
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-DEBUG = int(os.getenv("DEBUG_VALUE", 1))
+DEBUG = int(os.getenv("DEBUG_VALUE", "1"))
 TESTING = "pytest" in sys.modules
 DEFAULT_AUTO_FIELD = "django.db.models.AutoField"
 
@@ -95,7 +95,7 @@ DATABASES = {
         "USER": os.getenv("DATABASE_USERNAME", "beer"),
         "PASSWORD": env_secret("DATABASE_PASSWORD", "123123"),
         "HOST": os.getenv("DATABASE_HOST", "127.0.0.1"),
-        "PORT": os.getenv("DATABASE_PORT", 5432),
+        "PORT": os.getenv("DATABASE_PORT", "5432"),
         "OPTIONS": json.loads(os.getenv("DATABASE_OPTIONS", "{}")),
     }
 }
@@ -181,16 +181,16 @@ REST_FRAMEWORK = {
 }
 
 API_KEY_CUSTOM_HEADER = "HTTP_X_API_KEY"
-API_LOCKDOWN_ENABLED = int(os.getenv("API_LOCKDOWN_ENABLED", 0))
+API_LOCKDOWN_ENABLED = int(os.getenv("API_LOCKDOWN_ENABLED", "0"))
 
 if API_LOCKDOWN_ENABLED:
     REST_FRAMEWORK["DEFAULT_PERMISSION_CLASSES"] = (
         "apikeys.permissions.IsAuthenticatedOrHasAPIKey",
     )
-    REST_FRAMEWORK["DEFAULT_THROTTLE_CLASSES"] = (
+    REST_FRAMEWORK["DEFAULT_THROTTLE_CLASSES"] = [
         "apikeys.throttling.TieredAPIKeyThrottle",
         "rest_framework.throttling.UserRateThrottle",
-    )
+    ]
 
 
 if REDIS_CACHE_URL:
