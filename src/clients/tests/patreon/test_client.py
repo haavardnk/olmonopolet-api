@@ -52,6 +52,7 @@ def _patreon_env(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("PATREON_CLIENT_SECRET", "client-secret")
     monkeypatch.setenv("PATREON_CAMPAIGN_ID", CAMPAIGN_ID)
     monkeypatch.setenv("PATREON_REFRESH_TOKEN", "bootstrap-refresh")
+    monkeypatch.delenv("PATREON_ACCESS_TOKEN", raising=False)
 
 
 @pytest.mark.django_db
