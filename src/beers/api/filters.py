@@ -51,6 +51,7 @@ class BeerFilter(flt.FilterSet):
     store = flt.CharFilter(method="custom_store_filter")
     country = flt.CharFilter(method="custom_country_filter")
     main_category = flt.CharFilter(method="custom_main_category_filter")
+    package_type = flt.CharFilter(method="custom_package_type_filter")
     price_high = flt.NumberFilter(field_name="price", lookup_expr="lte")
     price_low = flt.NumberFilter(field_name="price", lookup_expr="gte")
     value_score_high = flt.NumberFilter(field_name="value_score", lookup_expr="lte")
@@ -120,6 +121,12 @@ class BeerFilter(flt.FilterSet):
         query = self._build_multi_value_query(value, "main_category__iexact")
         return queryset.filter(query).distinct()
 
+    def custom_package_type_filter(
+        self, queryset: QuerySet[Beer], name: str, value: str
+    ) -> QuerySet[Beer]:
+        query = self._build_multi_value_query(value, "package_type__iexact")
+        return queryset.filter(query)
+
     def custom_user_tasted_filter(
         self, queryset: QuerySet[Beer], name: str, value: bool
     ) -> QuerySet[Beer]:
@@ -156,6 +163,7 @@ class BeerFilter(flt.FilterSet):
             "store_delivery",
             "is_christmas_beer",
             "main_category",
+            "package_type",
             "user_tasted",
             "value_score_high",
             "value_score_low",

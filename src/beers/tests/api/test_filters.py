@@ -98,6 +98,30 @@ class TestAllergenFilter:
 
 
 @pytest.mark.django_db
+class TestPackageTypeFilter:
+    @pytest.mark.parametrize(
+        ("value", "expected"),
+        [
+            ("can", {"can"}),
+            ("bottle, can", {"bottle", "can"}),
+            ("other", {"other"}),
+        ],
+    )
+    def test_filters_by_package_type(self, value: str, expected: set[str]) -> None:
+        beers = {
+            package: BeerFactory(package_type=package)
+            for package in ("bottle", "can", "other")
+        }
+        BeerFactory(package_type=None)
+
+        f = BeerFilter()
+        result = f.custom_package_type_filter(Beer.objects.all(), "package_type", value)
+        pks = set(result.values_list("pk", flat=True))
+
+        assert pks == {beers[package].pk for package in expected}
+
+
+@pytest.mark.django_db
 class TestNullsAlwaysLastOrderingFilter:
     def _make_request(self, ordering: str) -> Request:
         django_request = RequestFactory().get(f"/?ordering={ordering}")

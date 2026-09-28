@@ -130,6 +130,7 @@ class VmpProductDetail(VmpProduct):
     year: int | None = None
     sugar: str | None = None
     acid: str | None = None
+    package_type: str | None = Field(default=None, alias="packageType")
 
 
 class Address(_Base):

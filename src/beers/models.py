@@ -93,6 +93,11 @@ class Brewery(models.Model):
 
 
 class Beer(DirtyFieldsMixin, models.Model):
+    class PackageType(models.TextChoices):
+        BOTTLE = "bottle", "Bottle"
+        CAN = "can", "Can"
+        OTHER = "other", "Other"
+
     objects: ClassVar[BeerManager] = BeerManager()
 
     badge_set: models.Manager["Badge"]
@@ -117,6 +122,9 @@ class Beer(DirtyFieldsMixin, models.Model):
     )
     post_delivery = models.BooleanField(blank=True, null=True)
     store_delivery = models.BooleanField(blank=True, null=True)
+    package_type = models.CharField(
+        max_length=10, choices=PackageType.choices, blank=True, null=True
+    )
 
     # Vinmonopolet detailed info
     year = models.IntegerField(blank=True, null=True)

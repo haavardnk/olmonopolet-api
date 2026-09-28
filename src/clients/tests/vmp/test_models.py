@@ -42,6 +42,7 @@ DETAIL_JSON = {
     "vintage": 2024,
     "sugar": "< 1 g/l",
     "acid": "5,2",
+    "packageType": "Glass",
     "content": {
         "characteristics": [
             {"name": "Fylde", "value": 3},
@@ -109,6 +110,7 @@ class TestProductDetail:
 
         assert detail.color == "Gyllen"
         assert detail.vintage == 2024
+        assert detail.package_type == "Glass"
         assert detail.producer is not None
         assert detail.producer.name == "Amundsen Bryggeri"
         assert detail.content is not None

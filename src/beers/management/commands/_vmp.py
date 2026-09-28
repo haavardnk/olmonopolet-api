@@ -17,6 +17,15 @@ CATEGORIES: list[tuple[str, str | None]] = [
     ("alkoholfritt", "alkoholfritt_alkoholfri_sider"),
 ]
 
+PACKAGE_TYPES: dict[str, Beer.PackageType] = {
+    "Glass": Beer.PackageType.BOTTLE,
+    "Metall": Beer.PackageType.CAN,
+    "Emballasje med pant": Beer.PackageType.CAN,
+    "Plast": Beer.PackageType.OTHER,
+    "Bag-in-box": Beer.PackageType.OTHER,
+    "Øvrig": Beer.PackageType.OTHER,
+}
+
 
 class VmpCommand(BaseCommand):
     def get_client(self, request_delay: tuple[float, float] | None = None) -> VmpClient:
@@ -24,6 +33,10 @@ class VmpCommand(BaseCommand):
             return VmpClient.from_external_api(request_delay)
         except VmpApiError as exc:
             raise CommandError(str(exc)) from exc
+
+
+def package_type(vmp_value: str) -> Beer.PackageType:
+    return PACKAGE_TYPES.get(vmp_value, Beer.PackageType.OTHER)
 
 
 def apply_product_fields(beer: Beer, product: VmpProduct) -> None:

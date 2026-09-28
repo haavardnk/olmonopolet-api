@@ -93,6 +93,7 @@ class BeerSerializer(DynamicFieldsMixin, serializers.ModelSerializer):
             "all_stock",
             "post_delivery",
             "store_delivery",
+            "package_type",
             "year",
             "fullness",
             "sweetness",

@@ -5,7 +5,7 @@ from argparse import ArgumentParser
 from django.core.management.base import CommandError
 from django.utils import timezone
 
-from beers.management.commands._vmp import VmpCommand
+from beers.management.commands._vmp import VmpCommand, package_type
 from beers.models import Beer
 from clients.vmp import VmpApiError
 from clients.vmp.models import VmpProductDetail
@@ -76,6 +76,8 @@ class Command(VmpCommand):
             beer.allergens = detail.allergens
         if detail.method is not None:
             beer.method = detail.method
+        if detail.package_type is not None:
+            beer.package_type = package_type(detail.package_type)
 
         content = detail.content
         if content is not None:
