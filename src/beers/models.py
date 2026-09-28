@@ -1,6 +1,6 @@
 import logging
 import uuid
-from typing import ClassVar
+from typing import TYPE_CHECKING, ClassVar
 
 import requests
 from dirtyfields import DirtyFieldsMixin
@@ -9,6 +9,9 @@ from django.db import models
 from django.db.models import Exists, F, OuterRef, Q, Value
 from django.db.models.deletion import CASCADE
 from django.db.models.functions import Greatest
+
+if TYPE_CHECKING:
+    from django.db.models.fields.related_descriptors import RelatedManager
 
 logger = logging.getLogger(__name__)
 
@@ -100,8 +103,8 @@ class Beer(DirtyFieldsMixin, models.Model):
 
     objects: ClassVar[BeerManager] = BeerManager()
 
-    badge_set: models.Manager["Badge"]
-    stock_set: models.Manager["Stock"]
+    badge_set: "RelatedManager[Badge]"
+    stock_set: "RelatedManager[Stock]"
     user_tasted: bool
 
     # Vinmonopolet info
@@ -439,7 +442,7 @@ class UntappdList(models.Model):
 
 
 class UserList(models.Model):
-    items: models.Manager["UserListItem"]
+    items: "RelatedManager[UserListItem]"
 
     class ListType(models.TextChoices):
         STANDARD = "standard", "Standard"
