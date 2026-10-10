@@ -69,6 +69,7 @@ INSTALLED_APPS = [
     "rest_framework_api_key",
     "beers",
     "apikeys",
+    "extension",
     "corsheaders",
 ]
 
@@ -177,6 +178,7 @@ REST_FRAMEWORK = {
         "apikey_official": "6000/min",
         "apikey_partner": "6000/min",
         "apikey_free": "120/min",
+        "extension_reports": "30/hour",
     },
 }
 
