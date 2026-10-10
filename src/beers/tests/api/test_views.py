@@ -1,4 +1,5 @@
 import io
+from datetime import UTC, datetime
 from unittest.mock import patch
 
 import pytest
@@ -12,6 +13,7 @@ from rest_framework.test import APIClient
 
 from beers.models import (
     Badge,
+    Beer,
     Release,
     Stock,
     Tasted,
@@ -76,6 +78,65 @@ class TestBeerViewSet:
         BeerFactory(active=True, style="IPA")
         response = client.get("/beers/styles/")
         assert set(response.data) == {"IPA", "Stout"}
+
+    def test_style_stats(self, auth_client: tuple) -> None:
+        client, _user = auth_client
+        peers = [
+            (True, "IPA", 4.0, 10.0),
+            (True, "IPA", None, 30.0),
+            (False, "IPA", 5.0, 40.0),
+            (True, "Stout", 4.5, 50.0),
+        ]
+        for active, style, rating, unit_price in peers:
+            peer = BeerFactory(active=active, style=style, rating=rating)
+            Beer.objects.filter(pk=peer.pk).update(price_per_alcohol_unit=unit_price)
+        beer = BeerFactory(active=True, style="IPA", rating=3.5)
+        Beer.objects.filter(pk=beer.pk).update(price_per_alcohol_unit=20.0)
+        response = client.get(f"/beers/{beer.pk}/?fields=style_stats")
+        assert response.data["style_stats"] == {
+            "rank": 2,
+            "rated": 2,
+            "cheaper_than": 50,
+            "priced": 3,
+        }
+
+    def test_style_stats_without_style(self, auth_client: tuple) -> None:
+        client, _user = auth_client
+        beer = BeerFactory(style=None)
+        response = client.get(f"/beers/{beer.pk}/?fields=style_stats")
+        assert response.data["style_stats"] is None
+
+    def test_releases_lists_active_releases(self, auth_client: tuple) -> None:
+        client, _user = auth_client
+        beer = BeerFactory()
+        Release.objects.create(name="Jul").beer.add(beer)
+        Release.objects.create(name="Gammel", active=False).beer.add(beer)
+        response = client.get(f"/beers/{beer.pk}/?fields=releases")
+        assert [r["name"] for r in response.data["releases"]] == ["Jul"]
+
+    def test_insight_fields_are_opt_in(self, auth_client: tuple) -> None:
+        client, _user = auth_client
+        beer = BeerFactory(style="IPA")
+        response = client.get(f"/beers/{beer.pk}/")
+        assert "style_stats" not in response.data
+        assert "releases" not in response.data
+
+    @pytest.mark.parametrize(
+        "created_at,shown",
+        [
+            (datetime(2020, 12, 9, tzinfo=UTC), False),
+            (datetime(2023, 5, 1, tzinfo=UTC), True),
+        ],
+        ids=["backfilled", "tracked"],
+    )
+    def test_first_seen(
+        self, auth_client: tuple, created_at: datetime, shown: bool
+    ) -> None:
+        client, _user = auth_client
+        beer = BeerFactory()
+        Beer.objects.filter(pk=beer.pk).update(created_at=created_at)
+        response = client.get(f"/beers/{beer.pk}/?fields=first_seen")
+        assert (response.data["first_seen"] is not None) is shown
 
 
 @pytest.mark.django_db

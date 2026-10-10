@@ -1,10 +1,17 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
+from django.db.models import Count, F, Q
+from django.utils.functional import cached_property
 from drf_dynamic_fields import DynamicFieldsMixin
 from rest_framework import serializers
 
 from beers.api.utils import parse_bool
-from beers.models import Badge, Beer, Brewery, Stock
+from beers.models import Badge, Beer, Brewery, Release, Stock
+
+FIRST_SEEN_RELIABLE_FROM = datetime(2021, 1, 1, tzinfo=UTC)
+OPT_IN_FIELDS = frozenset({"style_stats", "releases"})
 
 
 class BrewerySerializer(serializers.ModelSerializer):
@@ -30,6 +37,55 @@ class BeerSerializer(DynamicFieldsMixin, serializers.ModelSerializer):
     )
     value_score = serializers.FloatField(read_only=True)
     user_tasted = serializers.BooleanField(read_only=True)
+    first_seen = serializers.SerializerMethodField()
+    style_stats = serializers.SerializerMethodField()
+    releases = serializers.SerializerMethodField()
+
+    @cached_property
+    def fields(self):
+        fields = super().fields
+        params = getattr(self.context.get("request"), "query_params", {})
+        requested = set((params.get("fields") or "").split(","))
+        for name in OPT_IN_FIELDS - requested:
+            fields.pop(name, None)
+        return fields
+
+    def get_first_seen(self, beer: Beer) -> datetime | None:
+        if beer.created_at < FIRST_SEEN_RELIABLE_FROM:
+            return None
+        return beer.created_at
+
+    def get_style_stats(self, beer: Beer) -> dict[str, int | None] | None:
+        if not beer.style:
+            return None
+        peers = Beer.objects.filter(Q(active=True) | Q(pk=beer.pk), style=beer.style)
+        counts = peers.aggregate(
+            rated=Count("pk", filter=Q(rating__isnull=False)),
+            rated_above=Count("pk", filter=Q(rating__gt=beer.rating or 0)),
+            priced=Count("pk", filter=Q(price_per_alcohol_unit__isnull=False)),
+            priced_above=Count(
+                "pk",
+                filter=Q(price_per_alcohol_unit__gt=beer.price_per_alcohol_unit or 0),
+            ),
+        )
+        rank = counts["rated_above"] + 1 if beer.rating is not None else None
+        cheaper_than = (
+            round(100 * counts["priced_above"] / (counts["priced"] - 1))
+            if beer.price_per_alcohol_unit is not None and counts["priced"] > 1
+            else None
+        )
+        return {
+            "rank": rank,
+            "rated": counts["rated"],
+            "cheaper_than": cheaper_than,
+            "priced": counts["priced"],
+        }
+
+    def get_releases(self, beer: Beer):
+        releases = beer.release_set.filter(active=True).order_by(
+            F("release_date").desc(nulls_last=True)
+        )
+        return BeerReleaseSerializer(instance=releases, many=True).data
 
     def get_badges(self, beer: Beer):
         return BadgeSerializer(instance=beer.badge_set.all(), many=True).data
@@ -113,7 +169,16 @@ class BeerSerializer(DynamicFieldsMixin, serializers.ModelSerializer):
             "is_christmas_beer",
             "value_score",
             "user_tasted",
+            "first_seen",
+            "style_stats",
+            "releases",
         ]
+
+
+class BeerReleaseSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Release
+        fields = ["name", "release_date"]
 
 
 class AllStockSerializer(serializers.ModelSerializer):
