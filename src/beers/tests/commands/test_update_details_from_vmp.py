@@ -34,3 +34,38 @@ def test_sets_package_type(vmp_value: str, expected: Beer.PackageType) -> None:
 
     beer.refresh_from_db()
     assert beer.package_type == expected
+
+
+@pytest.mark.django_db
+def test_sets_facet_fields() -> None:
+    beer = BeerFactory(vmp_id=1)
+    detail = VmpProductDetail.model_validate(
+        {
+            **PRODUCT,
+            "packageType": "Emballasje med pant",
+            "eco": False,
+            "gluten": True,
+            "environmentalPackaging": True,
+            "ageLimit": 18,
+            "main_producer": {"code": "jåttå", "name": "Jåttå"},
+            "main_wholesaler": {"code": "Jåttå AS", "name": "Jåttå AS"},
+            "content": {
+                "isGoodFor": [
+                    {"code": "D", "name": "Lyst kjøtt"},
+                    {"code": "Q", "name": "Svin"},
+                ]
+            },
+        }
+    )
+
+    Command()._update_product_details(beer, detail)
+
+    beer.refresh_from_db()
+    assert beer.package_material == "Emballasje med pant"
+    assert beer.eco is False
+    assert beer.gluten_free is True
+    assert beer.climate_smart_packaging is True
+    assert beer.age_limit == 18
+    assert beer.producer_code == "jåttå"
+    assert beer.wholesaler == "Jåttå AS"
+    assert beer.food_pairing_codes == ["D", "Q"]

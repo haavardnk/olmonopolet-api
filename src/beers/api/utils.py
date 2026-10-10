@@ -28,16 +28,21 @@ def parse_bool(val: str | bool) -> bool:
     raise ValueError(f"Invalid truth value: {val!r}")
 
 
-def get_or_create_country(country_name: str | None) -> Country | None:
+def get_or_create_country(
+    country_name: str | None, vmp_code: str | None = None
+) -> Country | None:
     if not country_name:
         return None
 
     country, created = Country.objects.get_or_create(
-        name=country_name, defaults={"iso_code": None}
+        name=country_name, defaults={"iso_code": None, "vmp_code": vmp_code}
     )
 
     if created:
         print(f"New country created: {country_name} - needs ISO mapping in admin")
+    elif vmp_code and country.vmp_code != vmp_code:
+        country.vmp_code = vmp_code
+        country.save(update_fields=["vmp_code"])
 
     return country
 

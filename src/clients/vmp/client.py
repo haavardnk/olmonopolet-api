@@ -81,8 +81,11 @@ class VmpClient:
         page: int = 0,
         page_size: int = 100,
         sort: str = "name-asc",
+        flag: str | None = None,
     ) -> SearchResponse:
-        url = self.search_url(category, sub_category, store_id, page, page_size, sort)
+        url = self.search_url(
+            category, sub_category, store_id, page, page_size, sort, flag
+        )
         return SearchResponse.model_validate(self._fetch(url))
 
     def search_url(
@@ -93,8 +96,9 @@ class VmpClient:
         page: int = 0,
         page_size: int = 100,
         sort: str = "name-asc",
+        flag: str | None = None,
     ) -> str:
-        query = self._build_query(category, sub_category, store_id, sort)
+        query = self._build_query(category, sub_category, store_id, sort, flag)
         return (
             f"{self._v2}products/search?currentPage={page}"
             f"&fields={_SEARCH_FIELDS}&pageSize={page_size}&q={query}"
@@ -178,12 +182,15 @@ class VmpClient:
         sub_category: str | None,
         store_id: int | None,
         sort: str,
+        flag: str | None = None,
     ) -> str:
         query = f":{sort}:mainCategory:{category}"
         if sub_category:
             query += f":mainSubCategory:{sub_category}"
         if store_id is not None:
             query += f":availableInStores:{store_id}"
+        if flag:
+            query += f":{flag}:true"
         return query
 
     def _fetch(self, url: str) -> dict:
