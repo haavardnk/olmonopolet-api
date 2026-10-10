@@ -5,6 +5,7 @@ from django.db.models import Prefetch, QuerySet
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, permissions
 from rest_framework.decorators import action
+from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
@@ -13,6 +14,7 @@ from beers.api.pagination import LargeResultPagination
 from beers.api.serializers import BeerSerializer
 from beers.api.utils import bulk_import_tasted, parse_untappd_file
 from beers.api.views.base import BrowsableMixin
+from beers.api.vmp_query import parse_vmp_query
 from beers.models import Beer, Stock, Tasted
 from clients.vmp import VmpApiError, VmpBlockedError, VmpClient
 
@@ -69,6 +71,13 @@ class BeerViewSet(BrowsableMixin, ModelViewSet):
             queryset = queryset.filter(vmp_id__in=beer_ids)
 
         return queryset
+
+    def list(self, request: Request, *args, **kwargs) -> Response:
+        response = super().list(request, *args, **kwargs)
+        vmp_query = request.query_params.get("vmp_query")
+        if vmp_query is not None and isinstance(response.data, dict):
+            response.data["ignored_facets"] = parse_vmp_query(vmp_query).ignored
+        return response
 
     @action(detail=False, methods=["get"], url_path="barcode")
     def barcode(self, request):

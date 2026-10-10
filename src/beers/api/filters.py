@@ -6,6 +6,7 @@ from rest_framework import filters
 from rest_framework.request import Request
 from rest_framework.views import APIView
 
+from beers.api.vmp_query import parse_vmp_query
 from beers.models import Beer, Stock, Tasted
 
 
@@ -64,6 +65,7 @@ class BeerFilter(flt.FilterSet):
     exclude_allergen = flt.CharFilter(method="custom_allergen_filter")
     is_christmas_beer = flt.BooleanFilter(field_name="is_christmas_beer")
     user_tasted = flt.BooleanFilter(method="custom_user_tasted_filter")
+    vmp_query = flt.CharFilter(method="custom_vmp_query_filter")
 
     def _build_multi_value_query(self, values: str, field_lookup: str) -> Q:
         query = Q()
@@ -142,6 +144,11 @@ class BeerFilter(flt.FilterSet):
         else:
             return queryset.filter(~Exists(user_tasted_subquery))
 
+    def custom_vmp_query_filter(
+        self, queryset: QuerySet[Beer], name: str, value: str
+    ) -> QuerySet[Beer]:
+        return queryset.filter(parse_vmp_query(value).query)
+
     class Meta:
         model = Beer
         fields = [
@@ -167,6 +174,7 @@ class BeerFilter(flt.FilterSet):
             "user_tasted",
             "value_score_high",
             "value_score_low",
+            "vmp_query",
         ]
 
 

@@ -70,6 +70,7 @@ class BeerSerializer(DynamicFieldsMixin, serializers.ModelSerializer):
             "volume",
             "price_per_volume",
             "abv",
+            "vmp_abv",
             "ibu",
             "alcohol_units",
             "price_per_alcohol_unit",
