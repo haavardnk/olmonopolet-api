@@ -66,6 +66,9 @@ class Command(VmpCommand):
     def _update_product_details(self, beer: Beer, detail: VmpProductDetail) -> None:
         if detail.producer is not None:
             beer.vmp_brewery = detail.producer.name
+            beer.producer_code = detail.producer.code
+        if detail.wholesaler is not None:
+            beer.wholesaler = detail.wholesaler.name
         if detail.color is not None:
             beer.color = detail.color
         if detail.smell is not None:
@@ -78,6 +81,11 @@ class Command(VmpCommand):
             beer.method = detail.method
         if detail.package_type is not None:
             beer.package_type = package_type(detail.package_type)
+            beer.package_material = detail.package_type
+        beer.eco = detail.eco
+        beer.gluten_free = detail.gluten
+        beer.climate_smart_packaging = detail.environmental_packaging
+        beer.age_limit = detail.age_limit
 
         content = detail.content
         if content is not None:
@@ -94,6 +102,9 @@ class Command(VmpCommand):
 
             if content.is_good_for:
                 beer.food_pairing = ", ".join(food.name for food in content.is_good_for)
+            beer.food_pairing_codes = [
+                food.code for food in content.is_good_for if food.code
+            ]
 
         if detail.vintage is not None:
             beer.year = detail.vintage

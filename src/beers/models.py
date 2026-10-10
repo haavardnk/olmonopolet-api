@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, ClassVar
 
 import requests
 from dirtyfields import DirtyFieldsMixin
+from django.contrib.postgres.fields import ArrayField
 from django.core.validators import MaxValueValidator, MinValueValidator, URLValidator
 from django.db import models
 from django.db.models import Exists, F, OuterRef, Q, Value
@@ -68,6 +69,7 @@ class Option(models.Model):
 class Country(models.Model):
     name = models.CharField(max_length=100, unique=True, primary_key=True)
     iso_code = models.CharField(max_length=2, blank=True, null=True)
+    vmp_code = models.CharField(max_length=100, blank=True, null=True)
 
     class Meta:
         ordering = ["name"]
@@ -128,6 +130,13 @@ class Beer(DirtyFieldsMixin, models.Model):
     package_type = models.CharField(
         max_length=10, choices=PackageType.choices, blank=True, null=True
     )
+    main_category_code = models.CharField(max_length=50, blank=True, null=True)
+    sub_category_code = models.CharField(max_length=100, blank=True, null=True)
+    district_code = models.CharField(max_length=100, blank=True, null=True)
+    sub_district_code = models.CharField(max_length=150, blank=True, null=True)
+    vmp_abv = models.FloatField(blank=True, null=True)
+    vegan = models.BooleanField(default=False)
+    is_new = models.BooleanField(default=False)
 
     # Vinmonopolet detailed info
     year = models.IntegerField(blank=True, null=True)
@@ -145,6 +154,16 @@ class Beer(DirtyFieldsMixin, models.Model):
     raw_materials = models.CharField(max_length=150, blank=True, null=True)
     allergens = models.CharField(max_length=100, blank=True, null=True)
     method = models.CharField(max_length=250, blank=True, null=True)
+    producer_code = models.CharField(max_length=150, blank=True, null=True)
+    wholesaler = models.CharField(max_length=150, blank=True, null=True)
+    package_material = models.CharField(max_length=50, blank=True, null=True)
+    food_pairing_codes = ArrayField(
+        models.CharField(max_length=5), default=list, blank=True
+    )
+    eco = models.BooleanField(blank=True, null=True)
+    gluten_free = models.BooleanField(blank=True, null=True)
+    climate_smart_packaging = models.BooleanField(blank=True, null=True)
+    age_limit = models.IntegerField(blank=True, null=True)
 
     # Untappd info
     untpd_id = models.IntegerField(blank=True, null=True)

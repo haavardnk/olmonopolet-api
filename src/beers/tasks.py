@@ -56,6 +56,10 @@ def update_details_from_vmp(calls: int) -> str:
     return _call_command_with_output("update_details_from_vmp", calls)
 
 
+def update_flags_from_vmp() -> str:
+    return _call_command_with_output("update_flags_from_vmp")
+
+
 def update_stock_from_vmp(
     stores: int,
     store_delay: float | None = None,

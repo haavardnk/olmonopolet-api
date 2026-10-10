@@ -17,6 +17,7 @@ class _Base(BaseModel):
 
 class Named(_Base):
     name: str
+    code: str | None = None
 
 
 class ValueField(_Base):
@@ -62,15 +63,18 @@ class VmpProduct(_Base):
     main_country: Named
     product_selection: str = DEFAULT_PRODUCT_SELECTION
     main_sub_category: Named | None = None
+    district: Named | None = None
+    sub_district: Named | None = Field(default=None, alias="sub_District")
+    alcohol: ValueField | None = None
     price: ValueField | None = None
     product_availability: ProductAvailability | None = Field(
         default=None, alias="productAvailability"
     )
     images: list[Image] = Field(default_factory=list)
 
-    @field_validator("main_sub_category", mode="before")
+    @field_validator("main_sub_category", "district", "sub_district", mode="before")
     @classmethod
-    def _empty_sub_category_to_none(cls, value: Any) -> Any:
+    def _empty_named_to_none(cls, value: Any) -> Any:
         if isinstance(value, dict) and not value.get("name"):
             return None
         return value
@@ -121,6 +125,13 @@ class Content(_Base):
 class VmpProductDetail(VmpProduct):
     content: Content | None = None
     producer: Named | None = Field(default=None, alias="main_producer")
+    wholesaler: Named | None = Field(default=None, alias="main_wholesaler")
+    eco: bool | None = None
+    gluten: bool | None = None
+    environmental_packaging: bool | None = Field(
+        default=None, alias="environmentalPackaging"
+    )
+    age_limit: int | None = Field(default=None, alias="ageLimit")
     color: str | None = None
     smell: str | None = None
     taste: str | None = None
@@ -167,7 +178,13 @@ class Facet(_Base):
     values: list[FacetValue] = Field(default_factory=list)
 
 
+class Breadcrumb(_Base):
+    facet_code: str | None = Field(default=None, alias="facetCode")
+    facet_value_code: str | None = Field(default=None, alias="facetValueCode")
+
+
 class SearchResponse(_Base):
     products: list[VmpProduct] = Field(default_factory=list)
     pagination: Pagination = Field(default_factory=Pagination)
     facets: list[Facet] = Field(default_factory=list)
+    breadcrumbs: list[Breadcrumb] = Field(default_factory=list)

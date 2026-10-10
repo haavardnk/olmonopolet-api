@@ -106,6 +106,35 @@ class TestApplyProductFields:
 
         assert beer.active is True
 
+    def test_sets_facet_codes(self, db):
+        Country.objects.create(name="Norge")
+        beer = Beer(vmp_id=9999)
+        apply_product_fields(
+            beer,
+            beer_product(
+                main_category={"code": "øl", "name": "Øl"},
+                main_sub_category={"code": "øl_ipa", "name": "India Pale Ale"},
+                main_country={"code": "norge", "name": "Norge"},
+                district={"code": "norge_rogaland", "name": "Rogaland"},
+                sub_District={"code": "norge_rogaland_stavanger", "name": "S"},
+                alcohol={"value": 5.9},
+            ),
+        )
+
+        assert beer.main_category_code == "øl"
+        assert beer.sub_category_code == "øl_ipa"
+        assert beer.district_code == "norge_rogaland"
+        assert beer.sub_district_code == "norge_rogaland_stavanger"
+        assert beer.vmp_abv == 5.9
+        assert Country.objects.get(name="Norge").vmp_code == "norge"
+
+    def test_empty_district_is_none(self, db):
+        beer = Beer(vmp_id=9999)
+        apply_product_fields(beer, beer_product(district={}, sub_District={}))
+
+        assert beer.district_code is None
+        assert beer.sub_district_code is None
+
 
 class TestDelivery:
     def test_post_and_store_delivery_true(self):

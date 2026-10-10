@@ -42,9 +42,17 @@ def package_type(vmp_value: str) -> Beer.PackageType:
 def apply_product_fields(beer: Beer, product: VmpProduct) -> None:
     beer.vmp_name = product.name
     beer.main_category = product.main_category.name
+    beer.main_category_code = product.main_category.code
     if product.main_sub_category:
         beer.sub_category = product.main_sub_category.name
-    beer.country = get_or_create_country(product.main_country.name)
+        beer.sub_category_code = product.main_sub_category.code
+    beer.country = get_or_create_country(
+        product.main_country.name, product.main_country.code
+    )
+    beer.district_code = product.district.code if product.district else None
+    beer.sub_district_code = product.sub_district.code if product.sub_district else None
+    if product.alcohol is not None:
+        beer.vmp_abv = product.alcohol.value
     beer.volume = product.volume.value / 100.0
     if product.price is not None:
         beer.price = product.price.value
