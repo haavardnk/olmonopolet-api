@@ -20,6 +20,7 @@ class ReleaseSerializer(DynamicFieldsMixin, serializers.ModelSerializer):
             "beer_count": getattr(release, "beer_count", 0),
             "cider_count": getattr(release, "cider_count", 0),
             "mead_count": getattr(release, "mead_count", 0),
+            "christmas_beer_count": getattr(release, "christmas_beer_count", 0),
         }
 
     class Meta:

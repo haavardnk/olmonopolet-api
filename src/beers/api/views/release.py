@@ -35,6 +35,9 @@ class ReleaseViewSet(BrowsableMixin, ReadOnlyModelViewSet):
                 mead_count=Count(
                     "beer", filter=Q(beer__main_category__iexact="Mjød"), distinct=True
                 ),
+                christmas_beer_count=Count(
+                    "beer", filter=Q(beer__is_christmas_beer=True), distinct=True
+                ),
                 product_selections=ArrayAgg("beer__product_selection", distinct=True),
             )
         return qs

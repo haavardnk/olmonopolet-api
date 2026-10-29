@@ -253,6 +253,17 @@ class TestReleaseViewSet:
         fresh_response = client.get("/release/")
         assert fresh_response.data["results"][0]["beer_count"] == 2
 
+    def test_product_stats_counts_christmas_beers(self) -> None:
+        client = APIClient()
+        release = Release.objects.create(name="Jul")
+        release.beer.add(
+            BeerFactory(main_category="Øl", is_christmas_beer=True),
+            BeerFactory(main_category="Øl", is_christmas_beer=True),
+            BeerFactory(main_category="Øl"),
+        )
+        response = client.get(f"/release/{release.pk}/?fields=product_stats")
+        assert response.data["product_stats"]["christmas_beer_count"] == 2
+
 
 @pytest.mark.django_db
 class TestUserListViewSet:
