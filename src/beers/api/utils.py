@@ -59,7 +59,7 @@ def _parse_checkin_time(raw: str | float | None) -> datetime | None:
 
     for fmt in _DATETIME_FORMATS:
         try:
-            dt = datetime.strptime(str(raw).strip(), fmt)  # noqa: DTZ007
+            dt = datetime.strptime(str(raw).strip(), fmt)
             return dt if dt.tzinfo else dt.replace(tzinfo=UTC)
         except ValueError:
             continue

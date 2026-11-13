@@ -1,6 +1,7 @@
 import pytest
 from django.contrib.auth.models import AnonymousUser
 from django.core.cache import cache
+from rest_framework.request import Request
 from rest_framework.test import APIRequestFactory
 from rest_framework.views import APIView
 
@@ -13,6 +14,11 @@ factory = APIRequestFactory()
 view = APIView()
 
 
+def make_request(api_key: str | None = None) -> Request:
+    headers = {"X-Api-Key": api_key} if api_key else None
+    return Request(factory.get("/beers/", headers=headers))
+
+
 @pytest.fixture(autouse=True)
 def clear_cache() -> None:
     cache.clear()
@@ -21,7 +27,7 @@ def clear_cache() -> None:
 @pytest.mark.django_db
 class TestIsAuthenticatedOrHasAPIKey:
     def test_anonymous_denied(self) -> None:
-        request = factory.get("/beers/")
+        request = make_request()
         request.user = AnonymousUser()
         permission = IsAuthenticatedOrHasAPIKey()
         assert not permission.has_permission(request, view)
@@ -30,19 +36,19 @@ class TestIsAuthenticatedOrHasAPIKey:
         _, key = ClientAPIKey.objects.create_key(
             name="test", tier=ClientAPIKey.Tier.FREE
         )
-        request = factory.get("/beers/", HTTP_X_API_KEY=key)
+        request = make_request(key)
         request.user = AnonymousUser()
         permission = IsAuthenticatedOrHasAPIKey()
         assert permission.has_permission(request, view)
 
     def test_invalid_key_denied(self) -> None:
-        request = factory.get("/beers/", HTTP_X_API_KEY="not.a.real.key")
+        request = make_request("not.a.real.key")
         permission = HasClientAPIKey()
         assert not permission.has_permission(request, view)
 
     def test_authenticated_user_allowed(self) -> None:
         user = UserFactory()
-        request = factory.get("/beers/")
+        request = make_request()
         request.user = user
         permission = IsAuthenticatedOrHasAPIKey()
         assert permission.has_permission(request, view)

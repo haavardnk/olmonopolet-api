@@ -3,37 +3,37 @@ name = "beermonopoly-api"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.12,<3.14"
+requires-python = ">=3.12,<3.15"
 dependencies = [
     "beautifulsoup4>=4.15.0",
     "cloudscraper25>=2.7.0",
-    "curl-cffi>=0.16.3",
+    "curl-cffi>=0.17.0",
     "django-admin-shell>=2.0.1",
     "django-cors-headers>=4.9.0",
     "django-dirtyfields>=1.9.9",
     "django-extensions>=4.1",
-    "django-filter>=26.1",
+    "django-filter>=26.2",
     "django-hosts>=7.0",
     "django-q2>=1.11.1",
-    "django>=6.1.1,<6.2",
+    "django>=6.1.3,<6.2",
     "djangorestframework-api-key>=3.1.0",
-    "djangorestframework>=3.18.1",
+    "djangorestframework>=3.18.3",
     "drf-dynamic-fields>=0.4.0",
     "factory-boy>=3.3.3",
     "feedparser>=6.0.14",
-    "firebase-admin>=7.7.0",
+    "firebase-admin>=7.8.0",
     "fuzzywuzzy>=0.18.0",
-    "gunicorn>=26.2.0",
+    "gunicorn>=27.0.1",
     "jupyter>=1.1.1",
-    "psycopg-binary>=3.3.6",
-    "psycopg>=3.3.6",
-    "pydantic>=2.13.5",
+    "psycopg-binary>=3.3.9",
+    "psycopg>=3.3.9",
+    "pydantic>=2.14.3",
     "pytest-django>=4.14.0",
-    "pytest>=9.1.1",
+    "pytest>=9.2.0",
     "redis>=8.1.0",
     "responses>=0.26.3",
-    "ruff>=0.16.9",
-    "sentry-sdk>=2.71.0",
+    "ruff>=0.17.5",
+    "sentry-sdk>=2.75.0",
 ]
 
 [tool.ruff]
@@ -67,13 +67,13 @@ bad-return = false
 
 [dependency-groups]
 dev = [
-    "coverage>=7.16.2",
+    "coverage>=7.17.3",
     "django-filter-stubs>=0.1.3",
-    "django-stubs>=6.1.1",
-    "djangorestframework-stubs>=3.18.1",
-    "pyrefly>=1.3.1",
+    "django-stubs>=6.1.2",
+    "djangorestframework-stubs>=3.18.2",
+    "pyrefly>=1.4.1",
     "pytest-cov>=7.1.0",
     "pytest-xdist>=3.8.0",
     "types-firebase-admin>=0.1.1",
-    "types-requests>=2.33.0",
+    "types-requests>=2.33.0.20261030",
 ]
