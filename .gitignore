@@ -134,3 +134,5 @@ dmypy.json
 
 #internal docs
 docs/
+
+backups/

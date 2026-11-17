@@ -74,6 +74,7 @@ dev = [
     "pyrefly>=1.4.1",
     "pytest-cov>=7.1.0",
     "pytest-xdist>=3.8.0",
+    "python-dotenv>=1.2.4",
     "types-firebase-admin>=0.1.1",
     "types-requests>=2.33.0.20261030",
 ]
